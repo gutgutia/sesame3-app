@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sesame3 — My Schools (Decision Engine)</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      /* Palette */
+      --bg-app: #FDFCF8;
+      --bg-sidebar: #F7F5F0;
+      --bg-card: #FFFFFF;
+      --accent-primary: #12756A;
+      --accent-surface: #E8F5F3;
+      --text-main: #2D2A26;
+      --text-muted: #6B665E;
+      --border-subtle: #ECEAE4;
+      --border-medium: #E0DCD4;
+      
+      /* Status Colors */
+      --reach-bg: #FEF2F2; --reach-text: #B91C1C;
+      --target-bg: #EFF6FF; --target-text: #1D4ED8;
+      --safety-bg: #ECFDF5; --safety-text: #047857;
+      
+      /* Spacing */
+      --radius-lg: 20px; --radius-md: 12px;
+      --shadow-card: 0 4px 20px rgba(45, 42, 38, 0.03);
+      
+      /* Fonts */
+      --font-display: 'Satoshi', sans-serif;
+      --font-body: 'Inter', sans-serif;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body { 
+      font-family: var(--font-body); background: var(--bg-app); color: var(--text-main); line-height: 1.6; font-size: 15px;
+    }
+    
+    .app-container { display: flex; min-height: 100vh; }
+    
+    /* Sidebar */
+    .sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-subtle); padding: 32px 24px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
+    .logo { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin-bottom: 48px; display: flex; align-items: center; gap: 8px; }
+    .logo-mark { width: 32px; height: 32px; background: var(--text-main); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-weight: 500; }
+    .nav-item:hover { background: rgba(0,0,0,0.03); color: var(--text-main); }
+    .nav-item.active { background: white; color: var(--accent-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .user-pill { background: rgba(255,255,255,0.6); border: 1px solid var(--border-subtle); padding: 12px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 12px; margin-top: auto; }
+    .user-avatar { width: 36px; height: 36px; background: var(--accent-surface); color: var(--accent-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+
+    /* Main */
+    .main { flex: 1; padding: 40px 60px; max-width: 1400px; }
+    
+    .header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .page-title { font-family: var(--font-display); font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+    .page-subtitle { color: var(--text-muted); font-size: 16px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; }
+    .btn-primary { background: var(--text-main); color: white; }
+    
+    /* Overview Stats */
+    .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-bottom: 40px; }
+    .stat-card { background: white; border: 1px solid var(--border-subtle); padding: 20px; border-radius: var(--radius-md); }
+    .stat-label { font-size: 13px; text-transform: uppercase; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+    .stat-value { font-family: var(--font-display); font-size: 32px; font-weight: 700; }
+    
+    /* School List Container */
+    .school-group { margin-bottom: 40px; }
+    .group-header { font-family: var(--font-display); font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; gap: 12px; }
+    .group-badge { font-size: 11px; padding: 4px 8px; border-radius: 6px; font-weight: 600; text-transform: uppercase; }
+    
+    .badge-reach { background: var(--reach-bg); color: var(--reach-text); }
+    .badge-target { background: var(--target-bg); color: var(--target-text); }
+    .badge-safety { background: var(--safety-bg); color: var(--safety-text); }
+    
+    /* School Card (Expanded Detail View Concept) */
+    .school-card {
+      background: white; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+      padding: 0; box-shadow: var(--shadow-card); margin-bottom: 20px; overflow: hidden;
+      display: grid; grid-template-columns: 280px 1fr;
+    }
+    
+    .school-sidebar { padding: 24px; background: #FAFAF9; border-right: 1px solid var(--border-subtle); }
+    .school-logo { width: 48px; height: 48px; background: #900; color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; margin-bottom: 16px; }
+    .school-name { font-family: var(--font-display); font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .school-loc { font-size: 13px; color: var(--text-muted); margin-bottom: 20px; }
+    
+    .chance-box { background: white; border: 1px solid var(--border-medium); border-radius: 12px; padding: 16px; text-align: center; margin-bottom: 20px; }
+    .chance-val { font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--text-main); }
+    .chance-label { font-size: 12px; color: var(--text-muted); }
+    
+    .school-content { padding: 24px; }
+    
+    /* Match Report (Radar Mock) */
+    .match-report { display: flex; gap: 32px; }
+    .gap-analysis { flex: 1; }
+    .analysis-title { font-size: 13px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 16px; }
+    
+    .factor-row { display: flex; align-items: center; margin-bottom: 12px; font-size: 13px; }
+    .factor-name { width: 100px; font-weight: 500; }
+    .factor-bar-bg { flex: 1; height: 8px; background: var(--bg-sidebar); border-radius: 10px; margin: 0 12px; position: relative; }
+    .factor-bar-school { position: absolute; top: -2px; bottom: -2px; width: 2px; background: #000; z-index: 2; } /* The bar to beat */
+    .factor-bar-fill { height: 100%; border-radius: 10px; }
+    
+    .fill-strong { background: var(--accent-primary); }
+    .fill-gap { background: #EF4444; }
+    .fill-ok { background: #F59E0B; }
+    
+    .analysis-insight {
+      background: var(--accent-surface); border-radius: 12px; padding: 16px; flex: 1;
+      font-size: 13px; color: var(--accent-primary); line-height: 1.5;
+    }
+    
+    /* Collapsed Row for List View */
+    .school-row {
+      background: white; border: 1px solid var(--border-subtle); border-radius: 12px;
+      padding: 16px 24px; display: flex; align-items: center; margin-bottom: 12px; gap: 24px;
+      transition: all 0.2s; cursor: pointer;
+    }
+    .school-row:hover { border-color: var(--accent-primary); transform: translateX(4px); }
+    .row-logo { width: 32px; height: 32px; background: #003366; color: white; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 12px; }
+    .row-name { font-weight: 600; flex: 1; }
+    .row-deadline { color: var(--text-muted); font-size: 13px; }
+    .row-chance { font-family: var(--font-mono); font-weight: 600; font-size: 13px; }
+    
+  </style>
+</head>
+<body>
+  
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo"><div class="logo-mark">S3</div> Sesame</div>
+      <nav class="nav">
+        <a href="design-system-light-v3.html" class="nav-item"><i data-lucide="layout-grid"></i> Home</a>
+        <a href="plan-page.html" class="nav-item"><i data-lucide="compass"></i> Plan</a>
+        <a href="portfolio-page.html" class="nav-item"><i data-lucide="briefcase"></i> Portfolio</a>
+        <a href="#" class="nav-item active"><i data-lucide="book-open"></i> Schools</a>
+        <a href="#" class="nav-item"><i data-lucide="search"></i> Discover</a>
+      </nav>
+      <div class="user-pill"><div class="user-avatar">R</div><div>Rohan's Space</div></div>
+    </aside>
+    
+    <main class="main">
+      <div class="header">
+        <div>
+          <h1 class="page-title">My Schools</h1>
+          <div class="page-subtitle">Your decision funnel and application tracker.</div>
+        </div>
+        <button class="btn btn-primary"><i data-lucide="plus"></i> Add School</button>
+      </div>
+      
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">List Balance</div>
+          <div class="stat-value" style="font-size: 18px; color: var(--text-muted); font-weight: 500;">
+            <span style="color: #B91C1C; font-weight: 700;">4</span> Reach · 
+            <span style="color: #1D4ED8; font-weight: 700;">2</span> Target · 
+            <span style="color: #047857; font-weight: 700;">1</span> Safety
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Next Deadline</div>
+          <div class="stat-value">Jan 01</div>
+          <div style="font-size: 13px; color: var(--text-muted);">Stanford (RD)</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg Admission Chance</div>
+          <div class="stat-value">18%</div>
+        </div>
+      </div>
+      
+      <!-- Reach Schools (Detailed) -->
+      <div class="school-group">
+        <div class="group-header">
+          Reach Schools
+          <span class="group-badge badge-reach">Hard</span>
+        </div>
+        
+        <!-- Expanded School Card -->
+        <div class="school-card">
+          <!-- Sidebar Info -->
+          <div class="school-sidebar">
+            <div class="school-logo">S</div>
+            <div class="school-name">Stanford</div>
+            <div class="school-loc">Stanford, CA</div>
+            
+            <div class="chance-box">
+              <div class="chance-val">12-15%</div>
+              <div class="chance-label">Your Estimated Chance</div>
+            </div>
+            
+            <div style="font-size: 13px; color: var(--text-muted);">
+              <div style="margin-bottom: 6px;"><strong>Deadline:</strong> Jan 1 (RD)</div>
+              <div><strong>Status:</strong> Not Started</div>
+            </div>
+          </div>
+          
+          <!-- Match Analysis -->
+          <div class="school-content">
+            <div class="match-report">
+              <div class="gap-analysis">
+                <div class="analysis-title">Profile Match Report</div>
+                
+                <div class="factor-row">
+                  <div class="factor-name">Academics</div>
+                  <div class="factor-bar-bg">
+                    <div class="factor-bar-school" style="left: 90%;"></div>
+                    <div class="factor-bar-fill fill-strong" style="width: 92%;"></div>
+                  </div>
+                  <i data-lucide="check" style="width: 14px; color: var(--accent-primary);"></i>
+                </div>
+                
+                <div class="factor-row">
+                  <div class="factor-name">Testing</div>
+                  <div class="factor-bar-bg">
+                    <div class="factor-bar-school" style="left: 85%;"></div>
+                    <div class="factor-bar-fill fill-strong" style="width: 88%;"></div>
+                  </div>
+                  <i data-lucide="check" style="width: 14px; color: var(--accent-primary);"></i>
+                </div>
+                
+                <div class="factor-row">
+                  <div class="factor-name">Activities</div>
+                  <div class="factor-bar-bg">
+                    <div class="factor-bar-school" style="left: 95%;"></div>
+                    <div class="factor-bar-fill fill-ok" style="width: 70%;"></div>
+                  </div>
+                  <i data-lucide="minus" style="width: 14px; color: #F59E0B;"></i>
+                </div>
+                
+                <div class="factor-row">
+                  <div class="factor-name">Awards</div>
+                  <div class="factor-bar-bg">
+                    <div class="factor-bar-school" style="left: 80%;"></div>
+                    <div class="factor-bar-fill fill-gap" style="width: 40%;"></div>
+                  </div>
+                  <i data-lucide="alert-circle" style="width: 14px; color: #EF4444;"></i>
+                </div>
+              </div>
+              
+              <div class="analysis-insight">
+                <strong>Why this result?</strong><br><br>
+                Your academic profile is perfect for Stanford. However, your "Awards" pillar is below their typical admit threshold. <br><br>
+                <strong>Recommendation:</strong> Focus your Plan on securing a national-level award (like AIME or a research publication) to close this gap.
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Collapsed School -->
+        <div class="school-row">
+          <div class="row-logo" style="background: #A51C30;">H</div>
+          <div class="row-name">Harvard University</div>
+          <div class="row-deadline">Jan 1 (RD)</div>
+          <div class="row-chance">10%</div>
+        </div>
+         <div class="school-row">
+          <div class="row-logo" style="background: #00356B;">Y</div>
+          <div class="row-name">Yale University</div>
+          <div class="row-deadline">Jan 2 (RD)</div>
+          <div class="row-chance">14%</div>
+        </div>
+      </div>
+      
+      <!-- Target Schools -->
+      <div class="school-group">
+        <div class="group-header">
+          Target Schools
+          <span class="group-badge badge-target">Match</span>
+        </div>
+        <div class="school-row">
+          <div class="row-logo" style="background: #002855;">UC</div>
+          <div class="row-name">UCLA</div>
+          <div class="row-deadline">Nov 30 (UC)</div>
+          <div class="row-chance" style="color: var(--accent-primary);">42%</div>
+        </div>
+         <div class="school-row">
+          <div class="row-logo" style="background: #FFD100; color:black;">M</div>
+          <div class="row-name">University of Michigan</div>
+          <div class="row-deadline">Feb 1 (RD)</div>
+          <div class="row-chance" style="color: var(--accent-primary);">55%</div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

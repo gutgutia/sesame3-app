@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sesame3 — Dashboard v3</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-page: #F9FAFB;
+      --bg-card: #FFFFFF;
+      --border: #E5E7EB;
+      --text-primary: #111827;
+      --text-secondary: #6B7280;
+      --text-muted: #9CA3AF;
+      --accent: #6366F1;
+      --accent-hover: #4F46E5;
+      --accent-light: #EEF2FF;
+      --success: #22C55E;
+      --success-light: #DCFCE7;
+      --warning: #F59E0B;
+      --warning-light: #FEF3C7;
+      --error: #EF4444;
+      --error-light: #FEE2E2;
+      --font-display: 'Satoshi', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: var(--font-body); background: var(--bg-page); color: var(--text-primary); line-height: 1.5; font-size: 14px; }
+    .page { display: flex; min-height: 100vh; }
+    
+    /* Sidebar */
+    .sidebar { width: 220px; background: var(--bg-card); border-right: 1px solid var(--border); padding: 24px 16px; display: flex; flex-direction: column; position: fixed; height: 100vh; }
+    .logo { font-family: var(--font-display); font-weight: 700; font-size: 22px; margin-bottom: 32px; padding: 0 12px; }
+    .logo span { color: var(--accent); }
+    .nav { flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 8px; color: var(--text-secondary); text-decoration: none; font-weight: 500; margin-bottom: 2px; font-size: 14px; }
+    .nav-item:hover { background: var(--bg-page); color: var(--text-primary); }
+    .nav-item.active { background: var(--accent-light); color: var(--accent); }
+    .nav-icon { width: 18px; height: 18px; opacity: 0.7; }
+    .user-profile { display: flex; align-items: center; gap: 10px; padding: 12px; border-top: 1px solid var(--border); margin-top: 16px; padding-top: 20px; }
+    .user-avatar { width: 32px; height: 32px; background: var(--accent); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 13px; }
+    .user-name { font-weight: 500; font-size: 13px; }
+    .user-grade { font-size: 11px; color: var(--text-muted); }
+    
+    /* Main */
+    .main { flex: 1; padding: 32px; margin-left: 220px; }
+    .main-inner { max-width: 1050px; }
+    
+    /* Grid */
+    .grid-layout { display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
+    
+    /* Card */
+    .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+    .card:last-child { margin-bottom: 0; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+    .card-title { font-family: var(--font-display); font-size: 15px; font-weight: 600; }
+    .card-link { font-size: 12px; color: var(--accent); text-decoration: none; font-weight: 500; }
+    
+    /* Hero Input */
+    .hero-input-section { margin-bottom: 28px; }
+    .hero-greeting { font-family: var(--font-display); font-size: 26px; font-weight: 700; margin-bottom: 16px; }
+    .hero-input-box {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .hero-input-box:focus-within {
+      border-color: var(--accent);
+    }
+    .hero-input {
+      width: 100%;
+      border: none;
+      font-size: 16px;
+      font-family: var(--font-body);
+      color: var(--text-primary);
+      outline: none;
+      background: transparent;
+      resize: none;
+    }
+    .hero-input::placeholder {
+      color: var(--text-muted);
+    }
+    .hero-input-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .hero-input-hint {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .btn { font-family: var(--font-body); font-size: 13px; font-weight: 600; padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; }
+    .btn-primary { background: var(--accent); color: white; }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    
+    /* Priority Item */
+    .priority-item {
+      display: flex;
+      gap: 14px;
+      padding: 14px;
+      background: var(--bg-page);
+      border-radius: 10px;
+      margin-bottom: 10px;
+      align-items: flex-start;
+    }
+    .priority-item:last-child { margin-bottom: 0; }
+    .priority-item.urgent {
+      background: var(--warning-light);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+    }
+    .priority-checkbox {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--border);
+      border-radius: 6px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      cursor: pointer;
+    }
+    .priority-checkbox:hover { border-color: var(--accent); }
+    .priority-content { flex: 1; }
+    .priority-title { font-weight: 500; margin-bottom: 3px; }
+    .priority-meta { font-size: 12px; color: var(--text-secondary); }
+    .priority-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 100px;
+      text-transform: uppercase;
+    }
+    .priority-tag.task { background: var(--accent-light); color: var(--accent); }
+    .priority-tag.deadline { background: var(--warning-light); color: #B45309; }
+    
+    /* Goal Tracker */
+    .goal-item {
+      padding: 14px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .goal-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .goal-item:first-child { padding-top: 0; }
+    .goal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .goal-title { font-weight: 500; font-size: 13px; }
+    .goal-percent { font-family: var(--font-mono); font-size: 12px; color: var(--accent); font-weight: 600; }
+    .goal-bar {
+      height: 6px;
+      background: var(--border);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    .goal-bar-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 100px;
+    }
+    
+    /* Milestone */
+    .milestone-item {
+      display: flex;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .milestone-item:last-child { border-bottom: none; }
+    .milestone-date {
+      width: 44px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .milestone-month { font-size: 10px; color: var(--text-muted); text-transform: uppercase; }
+    .milestone-day { font-family: var(--font-mono); font-size: 16px; font-weight: 600; }
+    .milestone-title { font-weight: 500; }
+    .milestone-desc { font-size: 12px; color: var(--text-secondary); }
+    
+    /* Side Panel Items */
+    .side-section { margin-bottom: 20px; }
+    .side-section:last-child { margin-bottom: 0; }
+    .side-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 12px;
+    }
+    
+    /* Journey Mini */
+    .journey-mini {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .journey-phase {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 10px;
+    }
+    .journey-steps {
+      display: flex;
+      gap: 4px;
+    }
+    .journey-step {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 100px;
+    }
+    .journey-step.done { background: var(--success); }
+    .journey-step.current { background: var(--accent); }
+    .journey-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    
+    /* Dream School Mini */
+    .dream-school {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .dream-school-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    .dream-school-name { font-weight: 600; font-size: 14px; }
+    .dream-school-chance {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .dream-school-change {
+      font-size: 11px;
+      color: var(--success);
+    }
+    .dream-school-factors {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      font-size: 12px;
+    }
+    .factor {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 8px;
+      background: var(--bg-page);
+      border-radius: 6px;
+    }
+    .factor-name { color: var(--text-secondary); }
+    .factor-value { font-weight: 500; }
+    .factor-value.strong { color: var(--success); }
+    .factor-value.weak { color: var(--warning); }
+    .factor-value.gap { color: var(--error); }
+    
+    /* Quick Stats */
+    .quick-stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .quick-stat {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .quick-stat-value {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 600;
+    }
+    .quick-stat-value.accent { color: var(--accent); }
+    .quick-stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">SESAME<span>3</span></div>
+      <nav class="nav">
+        <a href="#" class="nav-item active">
+          <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          Dashboard
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Plan
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          Portfolio
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 7l9-5-9-5-9 5 9 5z"/></svg>
+          Schools
+        </a>
+        <a href="#" class="nav-item">
+          <svg class="nav-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          Discover
+        </a>
+      </nav>
+      <div class="user-profile">
+        <div class="user-avatar">R</div>
+        <div>
+          <div class="user-name">Rohan G.</div>
+          <div class="user-grade">10th Grade</div>
+        </div>
+      </div>
+    </aside>
+    
+    <!-- Main -->
+    <main class="main">
+      <div class="main-inner">
+        
+        <!-- Hero Input -->
+        <div class="hero-input-section">
+          <div class="hero-greeting">Hey Rohan 👋</div>
+          <div class="hero-input-box">
+            <textarea class="hero-input" rows="2" placeholder="What's on your mind today? Tell me what you've been working on, ask a question, or share what's stressing you out..."></textarea>
+            <div class="hero-input-footer">
+              <span class="hero-input-hint">I can help with college advice, planning, or just listen</span>
+              <button class="btn btn-primary">Share →</button>
+            </div>
+
+          </div>
+        </div>
+        
+        <!-- Main Grid -->
+        <div class="grid-layout">
+          <!-- Left Column -->
+          <div>
+            <!-- Priorities -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Priorities</div>
+                <a href="#" class="card-link">See all →</a>
+              </div>
+              
+              <div class="priority-item urgent">
+                <div class="priority-checkbox"></div>
+                <div class="priority-content">
+                  <div class="priority-title">Submit Stanford SIMR application</div>
+                  <div class="priority-meta">
+                    <span class="priority-tag deadline">Due in 3 days</span>
+                    · Summer Research Goal
+                  </div>
+                </div>
+              </div>
+              
+              <div class="priority-item">
+                <div class="priority-checkbox"></div>
+                <div class="priority-content">
+                  <div class="priority-title">Get recommendation letter from Mr. Chen</div>
+                  <div class="priority-meta">
+                    <span class="priority-tag task">Task</span>
+                    · UCSB SRA Application
+                  </div>
+                </div>
+              </div>
+              
+              <div class="priority-item">
+                <div class="priority-checkbox"></div>
+                <div class="priority-content">
+                  <div class="priority-title">Launch EduAccess website</div>
+                  <div class="priority-meta">
+                    <span class="priority-tag task">Task</span>
+                    · Nonprofit Project
+                  </div>
+                </div>
+              </div>
+              
+              <div class="priority-item">
+                <div class="priority-checkbox"></div>
+                <div class="priority-content">
+                  <div class="priority-title">Register for AMC 10</div>
+                  <div class="priority-meta">
+                    <span class="priority-tag deadline">Closes Jan 20</span>
+                    · Math Competition Goal
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Goals -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Goals</div>
+                <a href="#" class="card-link">View plan →</a>
+              </div>
+              
+              <div class="goal-item">
+                <div class="goal-header">
+                  <span class="goal-title">Get summer research experience</span>
+                  <span class="goal-percent">40%</span>
+                </div>
+                <div class="goal-bar"><div class="goal-bar-fill" style="width: 40%;"></div></div>
+              </div>
+              
+              <div class="goal-item">
+                <div class="goal-header">
+                  <span class="goal-title">Launch & grow EduAccess nonprofit</span>
+                  <span class="goal-percent">65%</span>
+                </div>
+                <div class="goal-bar"><div class="goal-bar-fill" style="width: 65%;"></div></div>
+              </div>
+              
+              <div class="goal-item">
+                <div class="goal-header">
+                  <span class="goal-title">Qualify for AIME</span>
+                  <span class="goal-percent">25%</span>
+                </div>
+                <div class="goal-bar"><div class="goal-bar-fill" style="width: 25%;"></div></div>
+              </div>
+            </div>
+            
+            <!-- Upcoming Milestones -->
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Upcoming</div>
+                <a href="#" class="card-link">Calendar →</a>
+              </div>
+              
+              <div class="milestone-item">
+                <div class="milestone-date">
+                  <div class="milestone-month">Jan</div>
+                  <div class="milestone-day">15</div>
+                </div>
+                <div>
+                  <div class="milestone-title">Stanford SIMR Deadline</div>
+                  <div class="milestone-desc">Application due</div>
+                </div>
+              </div>
+              
+              <div class="milestone-item">
+                <div class="milestone-date">
+                  <div class="milestone-month">Jan</div>
+                  <div class="milestone-day">20</div>
+                </div>
+                <div>
+                  <div class="milestone-title">AMC 10 Registration</div>
+                  <div class="milestone-desc">Sign-up closes</div>
+                </div>
+              </div>
+              
+              <div class="milestone-item">
+                <div class="milestone-date">
+                  <div class="milestone-month">Feb</div>
+                  <div class="milestone-day">8</div>
+                </div>
+                <div>
+                  <div class="milestone-title">AMC 10 Exam</div>
+                  <div class="milestone-desc">Competition day</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Right Column (Side Panel) -->
+          <div>
+            <!-- Quick Stats -->
+            <div class="side-section">
+              <div class="quick-stats">
+                <div class="quick-stat">
+                  <div class="quick-stat-value accent">3</div>
+                  <div class="quick-stat-label">Active Goals</div>
+                </div>
+                <div class="quick-stat">
+                  <div class="quick-stat-value">7</div>
+                  <div class="quick-stat-label">Open Tasks</div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Journey -->
+            <div class="side-section">
+              <div class="side-title">Your Journey</div>
+              <div class="journey-mini">
+                <div class="journey-phase">📍 Profile Building</div>
+                <div class="journey-steps">
+                  <div class="journey-step done"></div>
+                  <div class="journey-step current"></div>
+                  <div class="journey-step"></div>
+                  <div class="journey-step"></div>
+                </div>
+                <div class="journey-labels">
+                  <span>9th</span>
+                  <span>10th</span>
+                  <span>11th</span>
+                  <span>12th</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Dream School -->
+            <div class="side-section">
+              <div class="side-title">Dream School</div>
+              <div class="dream-school">
+                <div class="dream-school-header">
+                  <div>
+                    <div class="dream-school-name">Stanford</div>
+                    <div class="dream-school-change">↑ 5% this month</div>
+                  </div>
+                  <div class="dream-school-chance">23%</div>
+                </div>
+                <div class="dream-school-factors">
+                  <div class="factor">
+                    <span class="factor-name">Academics</span>
+                    <span class="factor-value strong">Strong</span>
+                  </div>
+                  <div class="factor">
+                    <span class="factor-name">Activities</span>
+                    <span class="factor-value strong">Strong</span>
+                  </div>
+                  <div class="factor">
+                    <span class="factor-name">Programs</span>
+                    <span class="factor-value weak">Building</span>
+                  </div>
+                  <div class="factor">
+                    <span class="factor-name">Awards</span>
+                    <span class="factor-value gap">Gap</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+    </main>
+  </div>
+</body>
+</html>
+

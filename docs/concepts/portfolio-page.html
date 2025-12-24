@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sesame3 — Portfolio (Living Resume)</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      /* Palette: Calm, Grounded, Warm */
+      --bg-app: #FDFCF8;
+      --bg-sidebar: #F7F5F0;
+      --bg-card: #FFFFFF;
+      
+      /* Accents */
+      --accent-primary: #12756A;
+      --accent-surface: #E8F5F3;
+      
+      /* Text */
+      --text-main: #2D2A26;
+      --text-muted: #6B665E;
+      
+      --border-subtle: #ECEAE4;
+      --border-medium: #E0DCD4;
+      
+      /* Status */
+      --tag-strong-bg: #EAF7ED; --tag-strong-text: #145935;
+      --tag-build-bg: #FEFCE8; --tag-build-text: #854D0E;
+      
+      /* Spacing & Radius */
+      --radius-lg: 20px; --radius-md: 12px;
+      --shadow-card: 0 4px 20px rgba(45, 42, 38, 0.03);
+      
+      /* Fonts */
+      --font-display: 'Satoshi', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body { 
+      font-family: var(--font-body); background: var(--bg-app); color: var(--text-main); line-height: 1.6; font-size: 15px;
+    }
+    
+    .app-container { display: flex; min-height: 100vh; }
+    
+    /* Sidebar (Standard) */
+    .sidebar { width: 260px; background: var(--bg-sidebar); border-right: 1px solid var(--border-subtle); padding: 32px 24px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; }
+    .logo { font-family: var(--font-display); font-weight: 700; font-size: 24px; margin-bottom: 48px; display: flex; align-items: center; gap: 8px; }
+    .logo-mark { width: 32px; height: 32px; background: var(--text-main); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; font-weight: 500; }
+    .nav-item:hover { background: rgba(0,0,0,0.03); color: var(--text-main); }
+    .nav-item.active { background: white; color: var(--accent-primary); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .user-pill { background: rgba(255,255,255,0.6); border: 1px solid var(--border-subtle); padding: 12px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 12px; margin-top: auto; }
+    .user-avatar { width: 36px; height: 36px; background: var(--accent-surface); color: var(--accent-primary); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; }
+
+    /* Main */
+    .main { flex: 1; padding: 40px 60px; max-width: 1400px; }
+    
+    .header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .page-title { font-family: var(--font-display); font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+    .page-subtitle { color: var(--text-muted); font-size: 16px; }
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; }
+    .btn-secondary { background: white; border: 1px solid var(--border-medium); color: var(--text-main); }
+    .btn-primary { background: var(--text-main); color: white; }
+
+    /* Portfolio Grid */
+    .pillar-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px;
+    }
+    
+    .pillar-card {
+      background: white; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+      padding: 24px; box-shadow: var(--shadow-card);
+      transition: all 0.2s; position: relative;
+    }
+    .pillar-card:hover { border-color: var(--accent-border); transform: translateY(-2px); }
+    
+    .pillar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .pillar-title { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 18px; }
+    .pillar-icon { width: 36px; height: 36px; background: var(--bg-sidebar); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); }
+    
+    .status-badge {
+      font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;
+      padding: 4px 10px; border-radius: 100px;
+    }
+    .status-strong { background: var(--tag-strong-bg); color: var(--tag-strong-text); }
+    .status-build { background: var(--tag-build-bg); color: var(--tag-build-text); }
+    
+    /* Content Rows */
+    .data-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--bg-sidebar); }
+    .data-row:last-child { border-bottom: none; }
+    .data-label { color: var(--text-muted); font-size: 14px; }
+    .data-value { font-weight: 600; font-family: var(--font-mono); font-size: 15px; }
+    
+    /* List Items (Activities/Awards) */
+    .list-item { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--bg-sidebar); }
+    .list-item:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+    .item-title { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .item-meta { font-size: 13px; color: var(--text-muted); display: flex; gap: 12px; }
+    
+    /* Spike Visual */
+    .spike-indicator {
+      position: absolute; top: 24px; right: 24px;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
+    }
+    .spike-icon { color: var(--accent-primary); width: 20px; }
+    .spike-label { font-size: 10px; text-transform: uppercase; font-weight: 700; color: var(--accent-primary); letter-spacing: 0.05em; }
+
+  </style>
+</head>
+<body>
+  
+  <div class="app-container">
+    <aside class="sidebar">
+      <div class="logo"><div class="logo-mark">S3</div> Sesame</div>
+      <nav class="nav">
+        <a href="design-system-light-v3.html" class="nav-item"><i data-lucide="layout-grid"></i> Home</a>
+        <a href="plan-page.html" class="nav-item"><i data-lucide="compass"></i> Plan</a>
+        <a href="#" class="nav-item active"><i data-lucide="briefcase"></i> Portfolio</a>
+        <a href="schools-page.html" class="nav-item"><i data-lucide="book-open"></i> Schools</a>
+        <a href="#" class="nav-item"><i data-lucide="search"></i> Discover</a>
+      </nav>
+      <div class="user-pill"><div class="user-avatar">R</div><div>Rohan's Space</div></div>
+    </aside>
+    
+    <main class="main">
+      <div class="header">
+        <div>
+          <h1 class="page-title">My Portfolio</h1>
+          <div class="page-subtitle">Your living resume and strengths profile.</div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-secondary"><i data-lucide="download"></i> Export PDF</button>
+          <button class="btn btn-primary"><i data-lucide="edit-3"></i> Edit Profile</button>
+        </div>
+      </div>
+      
+      <div class="pillar-grid">
+        
+        <!-- Academics -->
+        <div class="pillar-card">
+          <div class="pillar-header">
+            <div class="pillar-title">
+              <div class="pillar-icon"><i data-lucide="graduation-cap"></i></div>
+              Academics
+            </div>
+            <span class="status-badge status-strong">Strong</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">GPA (Unweighted)</span>
+            <span class="data-value">3.92</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">GPA (Weighted)</span>
+            <span class="data-value">4.25</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">Course Rigor</span>
+            <span class="data-value">8 AP / 4 Honors</span>
+          </div>
+          <div style="margin-top: 16px; padding: 12px; background: var(--bg-sidebar); border-radius: 8px; font-size: 13px; color: var(--text-muted);">
+            <i data-lucide="info" style="width: 14px; vertical-align: middle; margin-right: 4px;"></i>
+            Top 5% of class based on current trajectory.
+          </div>
+        </div>
+        
+        <!-- Testing -->
+        <div class="pillar-card">
+          <div class="pillar-header">
+            <div class="pillar-title">
+              <div class="pillar-icon"><i data-lucide="pen-tool"></i></div>
+              Testing
+            </div>
+            <span class="status-badge status-strong">Strong</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">SAT Super Score</span>
+            <span class="data-value">1540</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">Math Level 2</span>
+            <span class="data-value">800</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">AP Calculus BC</span>
+            <span class="data-value">5</span>
+          </div>
+          <div class="data-row">
+            <span class="data-label">AP Physics C</span>
+            <span class="data-value">5</span>
+          </div>
+        </div>
+        
+        <!-- Activities (The Spike) -->
+        <div class="pillar-card" style="grid-row: span 2;">
+          <div class="spike-indicator">
+            <i data-lucide="zap" class="spike-icon"></i>
+            <span class="spike-label">Spike</span>
+          </div>
+          <div class="pillar-header">
+            <div class="pillar-title">
+              <div class="pillar-icon"><i data-lucide="users"></i></div>
+              Activities
+            </div>
+            <span class="status-badge status-strong">Exceptional</span>
+          </div>
+          
+          <div class="list-item">
+            <div class="item-title">Founder & President, EduAccess Nonprofit</div>
+            <div class="item-meta">
+              <span>10th-11th</span> • <span>15 hr/wk</span>
+            </div>
+            <div style="margin-top: 8px; font-size: 13px; color: var(--text-main);">
+              Founded peer tutoring org growing to 50+ tutors. Partnered with 3 local districts. Raised $2k in grants.
+            </div>
+          </div>
+          
+          <div class="list-item">
+            <div class="item-title">Varsity Tennis Captain</div>
+            <div class="item-meta">
+              <span>9th-11th</span> • <span>12 hr/wk</span>
+            </div>
+          </div>
+          
+          <div class="list-item">
+            <div class="item-title">Robotics Lead Programmer</div>
+            <div class="item-meta">
+              <span>10th-11th</span> • <span>10 hr/wk</span>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Programs -->
+        <div class="pillar-card">
+          <div class="pillar-header">
+            <div class="pillar-title">
+              <div class="pillar-icon"><i data-lucide="flask-conical"></i></div>
+              Programs
+            </div>
+            <span class="status-badge status-build">Building</span>
+          </div>
+          
+          <div class="list-item">
+            <div class="item-title">COSMOS (Math Cluster)</div>
+            <div class="item-meta">Summer 2024 • Completed</div>
+          </div>
+          
+          <div class="list-item" style="opacity: 0.6;">
+            <div class="item-title">Stanford SIMR</div>
+            <div class="item-meta">Summer 2025 • <span style="color: var(--accent-primary); font-weight: 600;">Applying</span></div>
+          </div>
+        </div>
+        
+        <!-- Awards -->
+        <div class="pillar-card">
+           <div class="pillar-header">
+            <div class="pillar-title">
+              <div class="pillar-icon"><i data-lucide="trophy"></i></div>
+              Awards
+            </div>
+            <span class="status-badge status-build">Gap</span>
+          </div>
+          
+          <div class="list-item">
+            <div class="item-title">AIME Qualifier</div>
+            <div class="item-meta">National • 2024</div>
+          </div>
+          <div class="list-item">
+            <div class="item-title">AP Scholar with Distinction</div>
+            <div class="item-meta">National • 2024</div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+  <script>lucide.createIcons();</script>
+</body>
+</html>

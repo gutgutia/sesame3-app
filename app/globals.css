@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+:root {
+  /* Palette: Calm, Grounded, Warm */
+  --bg-app: #FDFCF8;
+  --bg-sidebar: #F7F5F0;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #FCFCFA;
+  
+  /* Accents */
+  --accent-primary: #12756A;
+  --accent-hover: #0F6158;
+  --accent-surface: #E8F5F3;
+  --accent-border: #C8EAE6;
+  
+  /* Functional Colors */
+  --text-main: #2D2A26;
+  --text-muted: #6B665E;
+  --text-light: #9E988E;
+  
+  --border-subtle: #ECEAE4;
+  --border-medium: #E0DCD4;
+  
+  /* Status */
+  --success-text: #145935;
+  --success-bg: #EAF7ED;
+  --warning-text: #854D0E;
+  --warning-bg: #FEFCE8; 
+  --info-bg: #F0F9FF;
+  --info-text: #0C4A6E;
+  --reach-bg: #FEF2F2; 
+  --reach-text: #B91C1C;
+  --target-bg: #EFF6FF; 
+  --target-text: #1D4ED8;
+  --safety-bg: #ECFDF5; 
+  --safety-text: #047857;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(45, 42, 38, 0.04);
+  --shadow-card: 0 4px 20px rgba(45, 42, 38, 0.03), 0 1px 3px rgba(45, 42, 38, 0.02);
+  --shadow-float: 0 12px 36px rgba(45, 42, 38, 0.06), 0 4px 8px rgba(45, 42, 38, 0.03);
+}
+
+@theme {
+  --color-bg-app: var(--bg-app);
+  --color-bg-sidebar: var(--bg-sidebar);
+  --color-bg-card: var(--bg-card);
+  --color-bg-card-hover: var(--bg-card-hover);
+  
+  --color-accent-primary: var(--accent-primary);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-surface: var(--accent-surface);
+  --color-accent-border: var(--accent-border);
+  
+  --color-text-main: var(--text-main);
+  --color-text-muted: var(--text-muted);
+  --color-text-light: var(--text-light);
+  
+  --color-border-subtle: var(--border-subtle);
+  --color-border-medium: var(--border-medium);
+  
+  --color-success-text: var(--success-text);
+  --color-success-bg: var(--success-bg);
+  --color-warning-text: var(--warning-text);
+  --color-warning-bg: var(--warning-bg);
+  
+  --font-display: 'Satoshi', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  
+  --shadow-card: var(--shadow-card);
+  --shadow-float: var(--shadow-float);
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}

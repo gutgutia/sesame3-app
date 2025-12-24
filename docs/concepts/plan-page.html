@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sesame3 — My Plan (Outcome Driven)</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      /* Palette: Calm, Grounded, Warm */
+      --bg-app: #FDFCF8;       /* Very warm off-white */
+      --bg-sidebar: #F7F5F0;   /* Slightly darker warm neutral */
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #FCFCFA;
+      
+      /* Accents - Trustworthy Deep Green/Teal */
+      --accent-primary: #12756A; /* Deep calming teal */
+      --accent-hover: #0F6158;
+      --accent-surface: #E8F5F3; /* Very light teal bg */
+      --accent-border: #C8EAE6;
+      
+      /* Functional Colors */
+      --text-main: #2D2A26;    /* Soft Black */
+      --text-muted: #6B665E;   /* Warm Grey */
+      --text-light: #9E988E;
+      
+      --border-subtle: #ECEAE4;
+      --border-medium: #E0DCD4;
+      
+      /* Status */
+      --success-text: #145935;
+      --success-bg: #EAF7ED;
+      --warning-text: #854D0E;
+      --warning-bg: #FEFCE8; 
+      
+      /* Spacing & Radius */
+      --radius-lg: 20px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      
+      /* Shadows */
+      --shadow-sm: 0 1px 2px rgba(45, 42, 38, 0.04);
+      --shadow-card: 0 4px 20px rgba(45, 42, 38, 0.03), 0 1px 3px rgba(45, 42, 38, 0.02);
+      
+      /* Fonts */
+      --font-display: 'Satoshi', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body { 
+      font-family: var(--font-body); 
+      background: var(--bg-app); 
+      color: var(--text-main); 
+      line-height: 1.6; 
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .app-container { display: flex; min-height: 100vh; }
+    
+    /* === Sidebar (Same as Dash) === */
+    .sidebar { 
+      width: 260px; 
+      background: var(--bg-sidebar); 
+      border-right: 1px solid var(--border-subtle); 
+      padding: 32px 24px; 
+      display: flex; flex-direction: column; position: sticky; top: 0; height: 100vh; 
+    }
+    .logo { 
+      font-family: var(--font-display); font-weight: 700; font-size: 24px; 
+      margin-bottom: 48px; color: var(--text-main); display: flex; align-items: center; gap: 8px;
+    }
+    .logo-mark {
+      width: 32px; height: 32px; background: var(--text-main); color: white; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .nav-item { 
+      display: flex; align-items: center; gap: 14px; padding: 12px 16px; 
+      border-radius: var(--radius-md); color: var(--text-muted); text-decoration: none; 
+      font-weight: 500; transition: all 0.2s ease;
+    }
+    .nav-item:hover { background: rgba(0,0,0,0.03); color: var(--text-main); }
+    .nav-item.active { background: white; color: var(--accent-primary); font-weight: 600; box-shadow: var(--shadow-sm); }
+    .nav-item i { width: 20px; height: 20px; stroke-width: 2px; }
+    .user-pill {
+      background: rgba(255,255,255,0.6); border: 1px solid var(--border-subtle);
+      padding: 12px; border-radius: var(--radius-md); display: flex; align-items: center; gap: 12px; margin-top: auto;
+    }
+    .user-avatar {
+      width: 36px; height: 36px; background: var(--accent-surface); color: var(--accent-primary);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600;
+    }
+    
+    /* === Main Content === */
+    .main { flex: 1; padding: 40px 60px; max-width: 1400px; }
+    
+    .header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-end; }
+    .page-title { font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--text-main); margin-bottom: 8px; }
+    .page-subtitle { color: var(--text-muted); font-size: 16px; }
+    
+    .header-actions { display: flex; gap: 12px; }
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px;
+      border-radius: 10px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; transition: all 0.2s;
+    }
+    .btn-primary { background: var(--text-main); color: white; }
+    .btn-secondary { background: white; border: 1px solid var(--border-medium); color: var(--text-main); }
+    
+    /* Filter Tabs */
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 32px; overflow-x: auto; padding-bottom: 4px; }
+    .filter-chip {
+      padding: 8px 16px; border-radius: 100px; font-size: 14px; font-weight: 500;
+      color: var(--text-muted); background: transparent; border: 1px solid var(--border-subtle); cursor: pointer; white-space: nowrap;
+    }
+    .filter-chip.active { background: var(--text-main); color: white; border-color: var(--text-main); }
+    .filter-chip:hover:not(.active) { background: rgba(0,0,0,0.03); color: var(--text-main); }
+    
+    /* === Goal Cards (The Strategy) === */
+    .goals-list { display: flex; flex-direction: column; gap: 24px; }
+    
+    .goal-card {
+      background: white; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+      padding: 24px; box-shadow: var(--shadow-card); position: relative;
+    }
+    .goal-card.expanded { border-color: var(--accent-border); box-shadow: var(--shadow-float); }
+    
+    .goal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; cursor: pointer; }
+    
+    .goal-meta { display: flex; gap: 12px; margin-bottom: 8px; }
+    .pillar-tag {
+      font-size: 11px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;
+      padding: 4px 8px; border-radius: 6px; background: var(--bg-sidebar); color: var(--text-muted);
+    }
+    .impact-tag {
+      font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 6px;
+      background: var(--success-bg); color: var(--success-text); display: flex; align-items: center; gap: 4px;
+    }
+    
+    .goal-title { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text-main); }
+    
+    .goal-progress-section { display: flex; align-items: center; gap: 16px; width: 240px; }
+    .progress-bar-bg { flex: 1; height: 6px; background: var(--bg-sidebar); border-radius: 100px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--accent-primary); border-radius: 100px; }
+    .progress-text { font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--text-muted); width: 36px; text-align: right; }
+    
+    /* Expanded Content */
+    .goal-body { 
+      padding-top: 24px; border-top: 1px solid var(--border-subtle); margin-top: 16px;
+      display: none; /* Hidden by default */
+    }
+    .goal-card.expanded .goal-body { display: block; }
+    
+    /* Opportunity (Sub-Goal) */
+    .opp-item { margin-bottom: 24px; }
+    .opp-item:last-child { margin-bottom: 0; }
+    
+    .opp-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .opp-icon { 
+      width: 32px; height: 32px; background: var(--accent-surface); color: var(--accent-primary);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    }
+    .opp-title { font-weight: 600; font-size: 16px; }
+    .opp-status { font-size: 12px; color: var(--text-muted); background: var(--bg-sidebar); padding: 2px 8px; border-radius: 4px; }
+    
+    /* Task List */
+    .task-list { padding-left: 44px; }
+    .task-row {
+      display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--bg-sidebar);
+    }
+    .task-row:last-child { border-bottom: none; }
+    
+    .task-checkbox {
+      width: 20px; height: 20px; border: 2px solid var(--border-medium); border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.2s;
+    }
+    .task-checkbox:hover { border-color: var(--accent-primary); }
+    .task-checkbox.checked { background: var(--accent-primary); border-color: var(--accent-primary); color: white; }
+    
+    .task-content { flex: 1; }
+    .task-text { font-size: 14px; color: var(--text-main); font-weight: 500; }
+    .task-text.done { text-decoration: line-through; color: var(--text-light); }
+    .task-due { font-size: 12px; color: var(--text-light); margin-top: 2px; display: flex; align-items: center; gap: 4px; }
+    .task-due.urgent { color: var(--warning-text); font-weight: 500; }
+    
+    .task-actions { opacity: 0; transition: opacity 0.2s; }
+    .task-row:hover .task-actions { opacity: 1; }
+    .icon-btn { border: none; background: transparent; color: var(--text-muted); cursor: pointer; padding: 4px; }
+    .icon-btn:hover { color: var(--text-main); }
+    
+    /* Parking Lot (Ideas) */
+    .parking-lot { margin-top: 60px; padding-top: 40px; border-top: 1px dashed var(--border-medium); }
+    .parking-header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; color: var(--text-muted); }
+    .parking-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+    .idea-card {
+      background: #F9F8F6; border: 1px solid var(--border-subtle); border-radius: 12px; padding: 16px;
+      font-size: 14px; color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+    }
+    .idea-card:hover { background: white; border-color: var(--border-medium); box-shadow: var(--shadow-sm); color: var(--text-main); }
+    
+    /* Floating Action Button for Mobile (concept) */
+    .fab {
+      position: fixed; bottom: 32px; right: 32px; width: 56px; height: 56px;
+      background: var(--text-main); color: white; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; transition: transform 0.2s;
+    }
+    .fab:hover { transform: scale(1.05); }
+
+  </style>
+</head>
+<body>
+  
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-mark">S3</div>
+        Sesame
+      </div>
+      <nav class="nav">
+        <a href="design-system-light-v3.html" class="nav-item">
+          <i data-lucide="layout-grid"></i>
+          Home
+        </a>
+        <a href="#" class="nav-item active">
+          <i data-lucide="compass"></i>
+          Plan
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="briefcase"></i>
+          Portfolio
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="book-open"></i>
+          Schools
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="search"></i>
+          Discover
+        </a>
+      </nav>
+      <div class="user-pill">
+        <div class="user-avatar">R</div>
+        <div style="font-size: 14px; font-weight: 500;">Rohan's Space</div>
+      </div>
+    </aside>
+    
+    <!-- Main Area -->
+    <main class="main">
+      
+      <div class="header">
+        <div>
+          <h1 class="page-title">My Plan</h1>
+          <div class="page-subtitle">Your outcome-driven roadmap.</div>
+        </div>
+        <div class="header-actions">
+          <button class="btn btn-secondary"><i data-lucide="calendar"></i> Calendar View</button>
+          <button class="btn btn-primary"><i data-lucide="plus"></i> New Goal</button>
+        </div>
+      </div>
+      
+      <!-- Filters -->
+      <div class="filter-bar">
+        <button class="filter-chip active">All Goals</button>
+        <button class="filter-chip">Programs</button>
+        <button class="filter-chip">Academics</button>
+        <button class="filter-chip">Testing</button>
+        <button class="filter-chip">Essays</button>
+        <button class="filter-chip">Financial Aid</button>
+      </div>
+      
+      <!-- Goal List -->
+      <div class="goals-list">
+        
+        <!-- Goal 1: Expanded (Focus) -->
+        <div class="goal-card expanded">
+          <div class="goal-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <div style="flex:1">
+              <div class="goal-meta">
+                <span class="pillar-tag">Programs</span>
+                <span class="impact-tag"><i data-lucide="trending-up" style="width:12px;"></i> High Impact</span>
+              </div>
+              <div class="goal-title">Secure Summer Research Position</div>
+            </div>
+            <div class="goal-progress-section">
+              <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 40%;"></div></div>
+              <span class="progress-text">40%</span>
+              <i data-lucide="chevron-up" style="color:var(--text-muted); width:20px;"></i>
+            </div>
+          </div>
+          
+          <div class="goal-body">
+            <!-- Opportunity 1 -->
+            <div class="opp-item">
+              <div class="opp-header">
+                <div class="opp-icon"><i data-lucide="flask-conical"></i></div>
+                <div class="opp-title">Stanford SIMR</div>
+                <span class="opp-status">Applying</span>
+              </div>
+              <div class="task-list">
+                <div class="task-row">
+                  <div class="task-checkbox checked"><i data-lucide="check" style="width:14px;"></i></div>
+                  <div class="task-content">
+                    <div class="task-text done">Research program requirements</div>
+                  </div>
+                </div>
+                <div class="task-row">
+                  <div class="task-checkbox"></div>
+                  <div class="task-content">
+                    <div class="task-text">Draft Essay 1: "Why Science?"</div>
+                    <div class="task-due urgent"><i data-lucide="clock" style="width:12px;"></i> Due Tomorrow</div>
+                  </div>
+                  <div class="task-actions">
+                    <button class="icon-btn"><i data-lucide="edit-3" style="width:14px;"></i></button>
+                  </div>
+                </div>
+                <div class="task-row">
+                  <div class="task-checkbox"></div>
+                  <div class="task-content">
+                    <div class="task-text">Request transcript from counselor</div>
+                    <div class="task-due"><i data-lucide="calendar" style="width:12px;"></i> Jan 12</div>
+                  </div>
+                   <div class="task-actions">
+                    <button class="icon-btn"><i data-lucide="edit-3" style="width:14px;"></i></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+             <!-- Opportunity 2 -->
+            <div class="opp-item">
+              <div class="opp-header">
+                <div class="opp-icon" style="background: #F3F4F6; color: #4B5563;"><i data-lucide="microscope"></i></div>
+                <div class="opp-title">UCSB Research Mentorship</div>
+                <span class="opp-status">Not Started</span>
+              </div>
+              <div class="task-list">
+                <div class="task-row">
+                  <div class="task-checkbox"></div>
+                  <div class="task-content">
+                    <div class="task-text">Check eligibility dates</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Goal 2: Collapsed -->
+        <div class="goal-card">
+          <div class="goal-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <div style="flex:1">
+              <div class="goal-meta">
+                <span class="pillar-tag">Testing</span>
+                <span class="impact-tag" style="background:var(--bg-sidebar); color:var(--text-muted);"><i data-lucide="minus" style="width:12px;"></i> Medium Impact</span>
+              </div>
+              <div class="goal-title">Qualify for AIME (Math Competition)</div>
+            </div>
+            <div class="goal-progress-section">
+              <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 25%;"></div></div>
+              <span class="progress-text">25%</span>
+              <i data-lucide="chevron-down" style="color:var(--text-muted); width:20px;"></i>
+            </div>
+          </div>
+           <div class="goal-body">
+             <div class="task-list">
+               <div class="task-row"><div class="task-checkbox"></div><div class="task-text">Take Practice Exam 1</div></div>
+             </div>
+           </div>
+        </div>
+        
+        <!-- Goal 3: Collapsed -->
+        <div class="goal-card">
+          <div class="goal-header" onclick="this.parentElement.classList.toggle('expanded')">
+            <div style="flex:1">
+              <div class="goal-meta">
+                <span class="pillar-tag">Activities</span>
+              </div>
+              <div class="goal-title">Grow EduAccess Nonprofit</div>
+            </div>
+            <div class="goal-progress-section">
+              <div class="progress-bar-bg"><div class="progress-bar-fill" style="width: 65%;"></div></div>
+              <span class="progress-text">65%</span>
+              <i data-lucide="chevron-down" style="color:var(--text-muted); width:20px;"></i>
+            </div>
+          </div>
+          <div class="goal-body">
+            <!-- Content would go here -->
+          </div>
+        </div>
+
+      </div>
+      
+      <!-- Parking Lot -->
+      <div class="parking-lot">
+        <div class="parking-header">
+          <i data-lucide="archive" style="width:18px;"></i>
+          <strong>The Parking Lot</strong> — Ideas for later (so you don't forget)
+        </div>
+        <div class="parking-grid">
+          <div class="idea-card">
+            <div style="font-weight:600; margin-bottom:4px;">Start a podcast?</div>
+            Interview local STEM professors. Maybe for 11th grade summer.
+          </div>
+          <div class="idea-card">
+            <div style="font-weight:600; margin-bottom:4px;">Apply to LaunchX</div>
+            Entrepreneurship program. Need to check if I have time.
+          </div>
+          <div class="idea-card" style="border-style:dashed; display:flex; align-items:center; justify-content:center; gap:8px;">
+            <i data-lucide="plus"></i> Add Idea
+          </div>
+        </div>
+      </div>
+      
+    </main>
+    
+    <!-- Floating Action (Mobile Concept) -->
+    <!-- <div class="fab"><i data-lucide="plus"></i></div> -->
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

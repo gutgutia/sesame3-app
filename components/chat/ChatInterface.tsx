@@ -1,0 +1,398 @@
+"use client";
+
+import React, { useRef, useEffect, useState, useCallback } from "react";
+import { Send, ArrowLeft, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { ConfirmationWidget, WidgetType } from "./ConfirmationWidget";
+
+// Message type
+type Message = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+};
+
+// Widget from Parser
+type PendingWidget = {
+  id: string;
+  type: WidgetType;
+  data: Record<string, unknown>;
+  status: "pending" | "confirmed" | "dismissed";
+};
+
+interface ChatInterfaceProps {
+  initialMessage?: string;
+  mode?: "general" | "onboarding" | "chances" | "schools" | "planning" | "profile" | "story";
+  onProfileUpdate?: () => void;
+  preloadedWelcome?: string | null; // Pre-fetched welcome message from parent
+}
+
+export function ChatInterface({ 
+  initialMessage, 
+  mode = "general",
+  onProfileUpdate,
+  preloadedWelcome,
+}: ChatInterfaceProps) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const hasInitialized = useRef(false);
+  const welcomeSet = useRef(false);
+  
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(!preloadedWelcome); // Not loading if we have preloaded
+  const [pendingWidgets, setPendingWidgets] = useState<PendingWidget[]>([]);
+  
+  // Use preloaded welcome message if available, otherwise show loading
+  useEffect(() => {
+    if (welcomeSet.current) return;
+    
+    if (preloadedWelcome) {
+      // Use the pre-fetched welcome message immediately
+      welcomeSet.current = true;
+      setMessages([{
+        id: "welcome",
+        role: "assistant",
+        content: preloadedWelcome,
+      }]);
+      setIsLoading(false);
+      console.log("[Chat] Using pre-loaded welcome message");
+    }
+  }, [preloadedWelcome]);
+  
+  // Send message to API with Parser + Advisor dual-model architecture
+  const sendMessage = useCallback(async (content: string) => {
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content,
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(m => ({
+            role: m.role,
+            content: m.content,
+          })),
+          mode,
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to send message");
+      }
+      
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("No response body");
+      }
+      
+      const decoder = new TextDecoder();
+      let fullText = "";
+      let buffer = "";
+      
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: "",
+      };
+      
+      setMessages(prev => [...prev, assistantMessage]);
+      
+      // Read the stream - handle both SSE events and plain text
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+        
+        // Check for SSE widget event at start of stream
+        if (buffer.includes("event: widget")) {
+          const eventMatch = buffer.match(/event: widget\ndata: (.+?)(\n\n|$)/);
+          if (eventMatch) {
+            try {
+              const eventData = JSON.parse(eventMatch[1]);
+              if (eventData.type === "widget" && eventData.widget) {
+                const widget: PendingWidget = {
+                  id: `widget-${Date.now()}`,
+                  type: eventData.widget.type as WidgetType,
+                  data: eventData.widget.data,
+                  status: "pending",
+                };
+                setPendingWidgets(prev => [...prev, widget]);
+                console.log("[Chat] Widget from Parser:", widget.type);
+              }
+            } catch (e) {
+              console.error("[Chat] Failed to parse widget event:", e);
+            }
+            // Remove the SSE event from buffer, keep the rest as text
+            buffer = buffer.replace(/event: widget\ndata: .+?(\n\n|$)/, "");
+          }
+        }
+        
+        // Everything else is text content
+        if (buffer) {
+          fullText = buffer;
+          setMessages(prev => 
+            prev.map(m => 
+              m.id === assistantMessage.id 
+                ? { ...m, content: fullText }
+                : m
+            )
+          );
+        }
+      }
+      
+      // Fallback for empty response
+      if (!fullText.trim()) {
+        console.warn("Empty AI response received");
+        setMessages(prev => 
+          prev.map(m => 
+            m.id === assistantMessage.id 
+              ? { ...m, content: "I got that! What else would you like to share?" }
+              : m
+          )
+        );
+      }
+      
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages, mode]);
+  
+  // Auto-scroll to bottom
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages, pendingWidgets, isLoading]);
+  
+  // Handle initial message
+  useEffect(() => {
+    if (hasInitialized.current) return;
+    hasInitialized.current = true;
+    
+    if (initialMessage) {
+      setTimeout(() => {
+        sendMessage(initialMessage);
+      }, 500);
+    }
+  }, [initialMessage, sendMessage]);
+  
+  // Get current pending widget (show one at a time)
+  const currentWidget = pendingWidgets.find(w => w.status === "pending");
+  
+  // Handle widget confirmation
+  const handleWidgetConfirm = async (widgetId: string, data: Record<string, unknown>) => {
+    const widget = pendingWidgets.find(w => w.id === widgetId);
+    if (!widget) return;
+    
+    try {
+      const endpoint = getApiEndpoint(widget.type);
+      const method = getApiMethod(widget.type);
+      
+      const response = await fetch(endpoint, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      
+      if (response.ok) {
+        setPendingWidgets(prev => 
+          prev.map(w => w.id === widgetId ? { ...w, status: "confirmed" as const } : w)
+        );
+        onProfileUpdate?.();
+      } else {
+        console.error("Failed to save:", await response.text());
+      }
+    } catch (error) {
+      console.error("Failed to save data:", error);
+    }
+  };
+  
+  // Handle widget dismiss
+  const handleWidgetDismiss = (widgetId: string) => {
+    setPendingWidgets(prev => 
+      prev.map(w => w.id === widgetId ? { ...w, status: "dismissed" as const } : w)
+    );
+  };
+  
+  // Handle form submit
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading || currentWidget) return;
+    
+    sendMessage(input.trim());
+    setInput("");
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="h-16 flex items-center px-6 border-b border-border-subtle bg-white/80 backdrop-blur-sm sticky top-0 z-10">
+        <Link
+          href="/"
+          className="mr-4 p-2 hover:bg-bg-sidebar rounded-full transition-colors text-text-muted"
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-text-main text-white rounded-full flex items-center justify-center">
+            <Sparkles className="w-4 h-4" />
+          </div>
+          <span className="font-display font-bold text-lg text-text-main">Sesame</span>
+          {isLoading && (
+            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+          )}
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4" ref={scrollRef}>
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}
+          >
+            <div className="max-w-[85%]">
+              {msg.content && (
+                <div
+                  className={cn(
+                    "rounded-2xl px-5 py-3 text-[15px] leading-relaxed whitespace-pre-wrap",
+                    msg.role === "user"
+                      ? "bg-text-main text-white rounded-br-sm"
+                      : "bg-white border border-border-subtle text-text-main rounded-bl-sm shadow-sm"
+                  )}
+                >
+                  {msg.content}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        {/* Typing indicator */}
+        {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
+          <div className="flex justify-start">
+            <div className="bg-white border border-border-subtle rounded-2xl rounded-bl-sm px-5 py-4 shadow-sm flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce" />
+            </div>
+          </div>
+        )}
+        
+        {/* Current pending widget */}
+        {currentWidget && !isLoading && (
+          <div className="flex justify-start">
+            <div className="max-w-md w-full">
+              <ConfirmationWidget
+                type={currentWidget.type}
+                data={currentWidget.data}
+                onConfirm={(data) => handleWidgetConfirm(currentWidget.id, data)}
+                onDismiss={() => handleWidgetDismiss(currentWidget.id)}
+              />
+            </div>
+          </div>
+        )}
+        
+        {/* Confirmed widgets indicator */}
+        {pendingWidgets.filter(w => w.status === "confirmed").length > 0 && !currentWidget && (
+          <div className="flex justify-start">
+            <div className="bg-success-bg border border-[#BBF7D0] rounded-xl px-4 py-2 text-sm text-success-text flex items-center gap-2">
+              <span>✓</span>
+              <span>
+                {pendingWidgets.filter(w => w.status === "confirmed").length} item(s) saved to your profile
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className="p-4 md:p-6 bg-white border-t border-border-subtle">
+        <form onSubmit={handleSubmit} className="relative max-w-3xl mx-auto">
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Share your GPA, test scores, activities..."
+            className="w-full bg-bg-sidebar border border-border-medium rounded-xl pl-5 pr-14 py-4 text-[15px] focus:outline-none focus:border-accent-primary focus:ring-4 focus:ring-accent-surface transition-all"
+            disabled={isLoading || !!currentWidget}
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={!input.trim() || isLoading || !!currentWidget}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-text-main text-white rounded-lg hover:bg-black/80 disabled:opacity-40 transition-colors"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </form>
+        
+        {/* Quick suggestions */}
+        {!currentWidget && !isLoading && (
+          <div className="flex flex-wrap gap-2 mt-3 max-w-3xl mx-auto">
+            <QuickSuggestion onClick={() => setInput("My GPA is ")} label="Add GPA" />
+            <QuickSuggestion onClick={() => setInput("I got a ")} label="Add test score" />
+            <QuickSuggestion onClick={() => setInput("I'm involved in ")} label="Add activity" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function QuickSuggestion({ onClick, label }: { onClick: () => void; label: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="px-3 py-1.5 bg-bg-sidebar border border-border-subtle rounded-full text-xs text-text-muted hover:text-text-main hover:border-accent-primary transition-colors"
+    >
+      + {label}
+    </button>
+  );
+}
+
+// Helper functions
+
+function getApiEndpoint(widgetType: WidgetType): string {
+  const endpoints: Record<WidgetType, string> = {
+    gpa: "/api/profile/academics",
+    sat: "/api/profile/testing",
+    act: "/api/profile/testing",
+    activity: "/api/profile/activities",
+    award: "/api/profile/awards",
+    course: "/api/profile/courses",
+    program: "/api/profile/programs",
+    goal: "/api/profile/goals",
+    school: "/api/profile/schools",
+    profile: "/api/profile",
+  };
+  
+  return endpoints[widgetType];
+}
+
+function getApiMethod(widgetType: WidgetType): string {
+  const postTypes: WidgetType[] = ["activity", "award", "course", "program", "goal", "school"];
+  return postTypes.includes(widgetType) ? "POST" : "PUT";
+}

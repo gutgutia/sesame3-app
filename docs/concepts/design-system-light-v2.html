@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sesame3 — Student Dashboard v2 (Focus & Calm)</title>
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    :root {
+      /* Palette: Calm, Grounded, Warm */
+      --bg-app: #FDFCF8;       /* Very warm off-white */
+      --bg-sidebar: #F7F5F0;   /* Slightly darker warm neutral */
+      --bg-card: #FFFFFF;
+      --bg-card-hover: #FCFCFA;
+      
+      /* Accents - Trustworthy Deep Green/Teal */
+      --accent-primary: #12756A; /* Deep calming teal */
+      --accent-hover: #0F6158;
+      --accent-surface: #E8F5F3; /* Very light teal bg */
+      --accent-border: #C8EAE6;
+      
+      /* Functional Colors */
+      --text-main: #2D2A26;    /* Soft Black */
+      --text-muted: #6B665E;   /* Warm Grey */
+      --text-light: #9E988E;
+      
+      --border-subtle: #ECEAE4;
+      --border-medium: #E0DCD4;
+      
+      /* Status */
+      --success-text: #145935;
+      --success-bg: #EAF7ED;
+      --warning-text: #854D0E;
+      --warning-bg: #FEFCE8; /* Very subtle yellow */
+      
+      /* Spacing & Radius */
+      --radius-lg: 20px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      
+      /* Shadows - Soft & Diffused */
+      --shadow-sm: 0 1px 2px rgba(45, 42, 38, 0.04);
+      --shadow-card: 0 4px 20px rgba(45, 42, 38, 0.03), 0 1px 3px rgba(45, 42, 38, 0.02);
+      --shadow-float: 0 12px 36px rgba(45, 42, 38, 0.06), 0 4px 8px rgba(45, 42, 38, 0.03);
+      
+      /* Fonts */
+      --font-display: 'Satoshi', sans-serif;
+      --font-body: 'Inter', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body { 
+      font-family: var(--font-body); 
+      background: var(--bg-app); 
+      color: var(--text-main); 
+      line-height: 1.6; 
+      font-size: 15px; /* Slightly larger for readability */
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    .app-container { display: flex; min-height: 100vh; }
+    
+    /* === Sidebar === */
+    .sidebar { 
+      width: 260px; 
+      background: var(--bg-sidebar); 
+      border-right: 1px solid var(--border-subtle); 
+      padding: 32px 24px; 
+      display: flex; 
+      flex-direction: column; 
+      position: sticky; 
+      top: 0; 
+      height: 100vh; 
+    }
+    
+    .logo { 
+      font-family: var(--font-display); 
+      font-weight: 700; 
+      font-size: 24px; 
+      margin-bottom: 48px; 
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-mark {
+      width: 32px; height: 32px;
+      background: var(--text-main);
+      color: white;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    
+    .nav { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    
+    .nav-item { 
+      display: flex; 
+      align-items: center; 
+      gap: 14px; 
+      padding: 12px 16px; 
+      border-radius: var(--radius-md); 
+      color: var(--text-muted); 
+      text-decoration: none; 
+      font-weight: 500; 
+      transition: all 0.2s ease;
+    }
+    
+    .nav-item:hover { 
+      background: rgba(0,0,0,0.03); 
+      color: var(--text-main);
+    }
+    
+    .nav-item.active { 
+      background: white; 
+      color: var(--accent-primary); 
+      font-weight: 600;
+      box-shadow: var(--shadow-sm);
+    }
+    
+    .nav-item i { width: 20px; height: 20px; stroke-width: 2px; }
+    
+    .user-pill {
+      background: rgba(255,255,255,0.6);
+      border: 1px solid var(--border-subtle);
+      padding: 12px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: auto;
+    }
+    .user-avatar {
+      width: 36px; height: 36px;
+      background: var(--accent-surface);
+      color: var(--accent-primary);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600;
+    }
+    
+    /* === Main Content === */
+    .main { 
+      flex: 1; 
+      padding: 40px 60px; 
+      max-width: 1400px;
+    }
+    
+    .header-greeting { margin-bottom: 40px; }
+    .greeting-title {
+      font-family: var(--font-display);
+      font-size: 32px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 8px;
+    }
+    .greeting-subtitle {
+      color: var(--text-muted);
+      font-size: 16px;
+    }
+    
+    /* === Focus Area (The "One Thing") === */
+    .focus-section {
+      background: white;
+      border-radius: var(--radius-lg);
+      padding: 6px; /* Inner padding for border effect */
+      box-shadow: var(--shadow-float);
+      margin-bottom: 48px;
+      border: 1px solid var(--border-subtle);
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .focus-inner {
+      background: #FAFAF9;
+      border-radius: 14px;
+      padding: 32px;
+      display: flex;
+      gap: 40px;
+      align-items: center;
+      position: relative;
+    }
+    
+    /* Decorative soothing gradient blob */
+    .focus-bg-blob {
+      position: absolute;
+      top: -50%; right: -10%;
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, var(--accent-surface) 0%, rgba(255,255,255,0) 70%);
+      opacity: 0.8;
+      pointer-events: none;
+    }
+    
+    .focus-content { flex: 1; z-index: 1; }
+    
+    .focus-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: white;
+      border: 1px solid var(--border-medium);
+      border-radius: 100px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    
+    .focus-title {
+      font-family: var(--font-display);
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      line-height: 1.2;
+    }
+    
+    .focus-desc {
+      color: var(--text-muted);
+      margin-bottom: 24px;
+      max-width: 500px;
+    }
+    
+    .focus-actions { display: flex; gap: 12px; }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 14px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 15px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      border: none;
+    }
+    
+    .btn-primary {
+      background: var(--text-main); /* High contrast, solid */
+      color: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.15); }
+    
+    .btn-secondary {
+      background: white;
+      border: 1px solid var(--border-medium);
+      color: var(--text-main);
+    }
+    .btn-secondary:hover { background: var(--bg-app); border-color: var(--text-muted); }
+    
+    .focus-stat {
+      min-width: 200px;
+      text-align: right;
+      z-index: 1;
+    }
+    .focus-stat-val {
+      font-family: var(--font-display);
+      font-size: 42px;
+      font-weight: 700;
+      color: var(--accent-primary);
+    }
+    .focus-stat-label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    
+    /* === Dashboard Grid === */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 40px;
+    }
+    
+    /* Section Headers */
+    .section-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 700;
+    }
+    
+    /* Cards Generic */
+    .card {
+      background: white;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      box-shadow: var(--shadow-card);
+      margin-bottom: 24px;
+    }
+    
+    /* Quick Input (Zen Mode) */
+    .zen-input-wrapper { margin-bottom: 40px; }
+    .zen-input-box {
+      background: white;
+      border: 1px solid var(--border-medium);
+      border-radius: var(--radius-md);
+      padding: 8px;
+      display: flex;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.2s;
+    }
+    .zen-input-box:focus-within {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 4px var(--accent-surface);
+    }
+    .zen-input {
+      flex: 1;
+      border: none;
+      padding: 12px 16px;
+      font-size: 16px;
+      font-family: var(--font-body);
+      outline: none;
+      color: var(--text-main);
+    }
+    .zen-input::placeholder { color: var(--text-light); }
+    .zen-actions { display: flex; gap: 4px; }
+    .zen-btn {
+      width: 44px; height: 44px;
+      display: flex; align-items: center; justify-content: center;
+      border: none; background: transparent;
+      border-radius: 8px;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+    .zen-btn:hover { background: var(--bg-app); color: var(--text-main); }
+    
+    /* Goals List */
+    .goal-row {
+      display: flex; align-items: center; gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--bg-sidebar);
+    }
+    .goal-row:last-child { border-bottom: none; }
+    .goal-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      background: var(--bg-sidebar);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--text-muted);
+    }
+    .goal-icon.active { background: var(--accent-surface); color: var(--accent-primary); }
+    .goal-info { flex: 1; }
+    .goal-name { font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+    .goal-meta { font-size: 13px; color: var(--text-muted); }
+    
+    /* Progress Circle */
+    .progress-ring { width: 32px; height: 32px; }
+    .circular-chart { display: block; margin: 0 auto; max-width: 100%; max-height: 100%; }
+    .circle-bg { fill: none; stroke: var(--bg-sidebar); stroke-width: 3; }
+    .circle { fill: none; stroke-width: 3; stroke-linecap: round; stroke: var(--accent-primary); }
+    
+    /* Right Column Widgets */
+    .status-widget {
+      background: var(--success-bg);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex; gap: 12px;
+      align-items: start;
+      color: var(--success-text);
+      font-size: 14px;
+      border: 1px solid rgba(20, 89, 53, 0.1);
+    }
+    
+    .roadmap-list { display: flex; flex-direction: column; gap: 20px; position: relative; padding-left: 20px; }
+    .roadmap-line {
+      position: absolute; left: 7px; top: 10px; bottom: 10px; width: 2px; background: var(--border-subtle);
+    }
+    .roadmap-item { position: relative; }
+    .roadmap-dot {
+      position: absolute; left: -24px; top: 4px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: white;
+      border: 3px solid var(--border-medium);
+      z-index: 2;
+    }
+    .roadmap-item.done .roadmap-dot { border-color: var(--accent-primary); background: var(--accent-primary); }
+    .roadmap-item.active .roadmap-dot { border-color: var(--accent-primary); }
+    
+    .roadmap-date { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .roadmap-title { font-weight: 600; font-size: 14px; }
+    
+    /* Calm Footer */
+    .calm-footer {
+      margin-top: 60px;
+      text-align: center;
+      color: var(--text-light);
+      font-size: 13px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    
+  </style>
+</head>
+<body>
+  
+  <div class="app-container">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-mark">S3</div>
+        Sesame
+      </div>
+      
+      <nav class="nav">
+        <a href="#" class="nav-item active">
+          <i data-lucide="layout-grid"></i>
+          Home
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="compass"></i>
+          My Plan
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="book-open"></i>
+          Schools
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="sparkles"></i>
+          Essays
+        </a>
+        <a href="#" class="nav-item">
+          <i data-lucide="message-circle"></i>
+          Advisor
+        </a>
+      </nav>
+      
+      <div class="user-pill">
+        <div class="user-avatar">R</div>
+        <div style="font-size: 14px; font-weight: 500;">Rohan's Space</div>
+      </div>
+    </aside>
+    
+    <!-- Main Area -->
+    <main class="main">
+      
+      <div class="header-greeting">
+        <h1 class="greeting-title">Good morning, Rohan.</h1>
+        <div class="greeting-subtitle">You're doing great. Let's take it one step at a time.</div>
+      </div>
+      
+      <!-- Zen Input -->
+      <div class="zen-input-wrapper">
+        <div class="zen-input-box">
+          <input type="text" class="zen-input" placeholder="What's on your mind right now?">
+          <div class="zen-actions">
+            <button class="zen-btn"><i data-lucide="mic"></i></button>
+            <button class="zen-btn"><i data-lucide="paperclip"></i></button>
+            <button class="zen-btn" style="color: var(--accent-primary);"><i data-lucide="arrow-right"></i></button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- The ONE Thing (Focus Mode) -->
+      <div class="focus-section">
+        <div class="focus-inner">
+          <div class="focus-bg-blob"></div>
+          <div class="focus-content">
+            <div class="focus-label"><i data-lucide="target" style="width:14px; margin-right:4px;"></i> Current Focus</div>
+            <div class="focus-title">Submit Stanford SIMR Application</div>
+            <div class="focus-desc">
+              This is your highest impact task right now. The deadline is in 3 days. We've broken it down into small steps for you.
+            </div>
+            <div class="focus-actions">
+              <button class="btn btn-primary">
+                Continue Draft
+                <i data-lucide="arrow-right" style="width:16px;"></i>
+              </button>
+              <button class="btn btn-secondary">
+                <i data-lucide="clock"></i>
+                Ask for Extension
+              </button>
+            </div>
+          </div>
+          <div class="focus-stat">
+            <div class="focus-stat-val">85%</div>
+            <div class="focus-stat-label">Probability Impact</div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Grid -->
+      <div class="dashboard-grid">
+        
+        <!-- Left: Goals & Progress -->
+        <div>
+          <div class="section-header">
+            <div class="section-title">Active Goals</div>
+            <a href="#" style="color: var(--accent-primary); font-size: 14px; text-decoration: none; font-weight: 500;">View all</a>
+          </div>
+          
+          <div class="card">
+            <div class="goal-row">
+              <div class="goal-icon active"><i data-lucide="flask-conical"></i></div>
+              <div class="goal-info">
+                <div class="goal-name">Summer Research</div>
+                <div class="goal-meta">Applications open • 2 deadlines soon</div>
+              </div>
+              <div class="progress-ring">
+                <svg viewBox="0 0 36 36" class="circular-chart">
+                  <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="circle" stroke-dasharray="40, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+              </div>
+            </div>
+            
+            <div class="goal-row">
+              <div class="goal-icon"><i data-lucide="users"></i></div>
+              <div class="goal-info">
+                <div class="goal-name">EduAccess Nonprofit</div>
+                <div class="goal-meta">Growth phase • 50+ members</div>
+              </div>
+              <div class="progress-ring">
+                <svg viewBox="0 0 36 36" class="circular-chart">
+                  <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="circle" stroke-dasharray="65, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+              </div>
+            </div>
+            
+             <div class="goal-row">
+              <div class="goal-icon"><i data-lucide="calculator"></i></div>
+              <div class="goal-info">
+                <div class="goal-name">AIME Qualification</div>
+                <div class="goal-meta">Study plan created • Exam in Feb</div>
+              </div>
+              <div class="progress-ring">
+                <svg viewBox="0 0 36 36" class="circular-chart">
+                  <path class="circle-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="circle" stroke-dasharray="25, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Right: Context & Calendar -->
+        <div>
+           <div class="section-header">
+            <div class="section-title">Timeline</div>
+          </div>
+          
+          <div style="margin-bottom: 24px;">
+             <div class="status-widget">
+              <i data-lucide="check-circle-2" style="width:20px; height:20px; flex-shrink:0;"></i>
+              <div>
+                <div style="font-weight:600; margin-bottom:2px;">On Track</div>
+                <div style="opacity:0.9;">You're ahead of schedule for Jan.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="roadmap-list">
+              <div class="roadmap-line"></div>
+              
+              <div class="roadmap-item done">
+                <div class="roadmap-dot"></div>
+                <div class="roadmap-date">Yesterday</div>
+                <div class="roadmap-title" style="text-decoration: line-through; color: var(--text-muted);">Draft Intro Essay</div>
+              </div>
+              
+              <div class="roadmap-item active">
+                <div class="roadmap-dot"></div>
+                <div class="roadmap-date" style="color: var(--accent-primary);">Today</div>
+                <div class="roadmap-title">Gather transcripts</div>
+              </div>
+              
+               <div class="roadmap-item">
+                <div class="roadmap-dot"></div>
+                <div class="roadmap-date">Jan 15</div>
+                <div class="roadmap-title">SIMR Deadline</div>
+              </div>
+              
+               <div class="roadmap-item">
+                <div class="roadmap-dot"></div>
+                <div class="roadmap-date">Jan 20</div>
+                <div class="roadmap-title">AMC Registration</div>
+              </div>
+              
+            </div>
+          </div>
+          
+        </div>
+        
+      </div>
+      
+      <div class="calm-footer">
+        <i data-lucide="coffee" style="width:16px;"></i>
+        <span>Remember to take breaks. You've got this.</span>
+      </div>
+      
+    </main>
+  </div>
+
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>
