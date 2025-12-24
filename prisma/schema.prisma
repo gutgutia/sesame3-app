@@ -118,6 +118,7 @@ model AboutMe {
 
 // -----------------------------------------------------------------------------
 // Academics - GPA & Overview
+// GPA is CALCULATED from courses. School-reported values stored for reference.
 // -----------------------------------------------------------------------------
 
 model Academics {
@@ -125,19 +126,15 @@ model Academics {
   studentProfileId String @unique
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
   
-  // GPA
-  gpaUnweighted    Float?   // 0.0 - 4.0
-  gpaWeighted      Float?   // Can be > 4.0
-  gpaScale         Float?   // Usually 4.0 or 5.0
+  // School-reported GPA (optional - for reference if different from calculated)
+  // NOTE: Primary GPA should be CALCULATED from courses
+  schoolReportedGpaUnweighted  Float?   // What school transcript shows (0.0 - 4.0)
+  schoolReportedGpaWeighted    Float?   // What school transcript shows (can be > 4.0)
+  gpaScale                     Float?   // School's GPA scale (usually 4.0 or 5.0)
   
   // Class Standing
   classRank        Int?
   classSize        Int?
-  
-  // Course Rigor Summary (auto-calculated or manual)
-  apCourseCount       Int?
-  honorsCourseCount   Int?
-  collegeCourseCount  Int?  // Dual enrollment
   
   // Transcript
   transcriptUrl    String?  // If uploaded
@@ -189,36 +186,14 @@ model Course {
 }
 
 // -----------------------------------------------------------------------------
-// Testing - Standardized Test Scores
+// Testing - Standardized Test Scores (Multiple Attempts Supported)
 // -----------------------------------------------------------------------------
 
+// Container model for all testing data (one per student)
 model Testing {
   id               String @id @default(uuid())
   studentProfileId String @unique
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  
-  // SAT
-  satTotal        Int?      // 400-1600
-  satMath         Int?      // 200-800
-  satReading      Int?      // 200-800
-  satEssay        Int?      // If applicable
-  satDate         DateTime?
-  satSuperscored  Boolean   @default(false)
-  
-  // ACT
-  actComposite    Int?      // 1-36
-  actEnglish      Int?
-  actMath         Int?
-  actReading      Int?
-  actScience      Int?
-  actWriting      Int?
-  actDate         DateTime?
-  actSuperscored  Boolean   @default(false)
-  
-  // PSAT/NMSQT
-  psatTotal       Int?
-  psatDate        DateTime?
-  nmsqtQualified  Boolean?
   
   // Test Plans (for advising)
   planningToTakeSat     Boolean @default(false)
@@ -226,14 +201,80 @@ model Testing {
   plannedSatDate        DateTime?
   plannedActDate        DateTime?
   
+  // PSAT/NMSQT (usually just one)
+  psatTotal       Int?
+  psatMath        Int?
+  psatReading     Int?
+  psatDate        DateTime?
+  nmsqtQualified  Boolean?
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
-  // Related scores
+  // Multiple test attempts
+  satScores     SATScore[]
+  actScores     ACTScore[]
   apScores      APScore[]
-  subjectTests  SubjectTest[]
+  subjectTests  SubjectTest[]   // SAT Subject Tests (SAT II)
 }
 
+// SAT Score - Multiple attempts supported
+model SATScore {
+  id        String  @id @default(uuid())
+  testingId String
+  testing   Testing @relation(fields: [testingId], references: [id], onDelete: Cascade)
+  
+  // Scores
+  total     Int       // 400-1600 (calculated from sections)
+  math      Int       // 200-800
+  reading   Int       // 200-800 (Evidence-Based Reading & Writing)
+  
+  // Optional sections
+  essay     Int?      // 2-8 (if taken)
+  
+  // Date
+  testDate  DateTime
+  
+  // Flags
+  isSuperscored  Boolean @default(false)  // Is this the superscore?
+  isPrimary      Boolean @default(false)  // Show this as the main score?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([testingId])
+}
+
+// ACT Score - Multiple attempts supported
+model ACTScore {
+  id        String  @id @default(uuid())
+  testingId String
+  testing   Testing @relation(fields: [testingId], references: [id], onDelete: Cascade)
+  
+  // Scores
+  composite Int       // 1-36 (average of sections)
+  english   Int       // 1-36
+  math      Int       // 1-36
+  reading   Int       // 1-36
+  science   Int       // 1-36
+  
+  // Optional
+  writing   Int?      // 2-12 (if taken)
+  
+  // Date
+  testDate  DateTime
+  
+  // Flags
+  isSuperscored  Boolean @default(false)  // Is this the superscore?
+  isPrimary      Boolean @default(false)  // Show this as the main score?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([testingId])
+}
+
+// AP Exam Scores
 model APScore {
   id        String  @id @default(uuid())
   testingId String
@@ -241,21 +282,22 @@ model APScore {
   
   subject   String    // "Calculus BC", "Physics C: Mechanics"
   score     Int       // 1-5
-  year      Int?
+  year      Int       // Year taken (e.g., 2024)
   
   createdAt DateTime @default(now())
   
   @@index([testingId])
 }
 
+// SAT Subject Tests (SAT II) - Discontinued but still reportable
 model SubjectTest {
   id        String  @id @default(uuid())
   testingId String
   testing   Testing @relation(fields: [testingId], references: [id], onDelete: Cascade)
   
-  subject   String    // "Math Level 2", "Chemistry"
+  subject   String    // "Math Level 2", "Chemistry", "Physics"
   score     Int       // 200-800
-  date      DateTime?
+  testDate  DateTime?
   
   createdAt DateTime @default(now())
   

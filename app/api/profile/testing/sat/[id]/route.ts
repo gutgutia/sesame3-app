@@ -3,8 +3,8 @@ import { prisma } from "@/lib/db";
 import { requireProfile } from "@/lib/auth";
 
 /**
- * PUT /api/profile/courses/[id]
- * Update a course
+ * PUT /api/profile/testing/sat/[id]
+ * Update an SAT score
  */
 export async function PUT(
   request: NextRequest,
@@ -15,33 +15,35 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     
-    const course = await prisma.course.update({
+    // Calculate total from sections
+    const total = (body.math || 0) + (body.reading || 0);
+    
+    const satScore = await prisma.sATScore.update({
       where: { id },
       data: {
-        name: body.name,
-        subject: body.subject,
-        level: body.level,
-        status: body.status,
-        gradeLevel: body.gradeLevel,
-        grade: body.grade,
-        gradeNumeric: body.gradeNumeric,
-        credits: body.credits,
+        total,
+        math: body.math,
+        reading: body.reading,
+        essay: body.essay,
+        testDate: new Date(body.testDate),
+        isSuperscored: body.isSuperscored || false,
+        isPrimary: body.isPrimary || false,
       },
     });
     
-    return NextResponse.json(course);
+    return NextResponse.json(satScore);
   } catch (error) {
     if (error instanceof Error && error.message === "Profile not found") {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    console.error("Error updating course:", error);
-    return NextResponse.json({ error: "Failed to update course" }, { status: 500 });
+    console.error("Error updating SAT score:", error);
+    return NextResponse.json({ error: "Failed to update SAT score" }, { status: 500 });
   }
 }
 
 /**
- * DELETE /api/profile/courses/[id]
- * Delete a course
+ * DELETE /api/profile/testing/sat/[id]
+ * Delete an SAT score
  */
 export async function DELETE(
   _request: NextRequest,
@@ -51,7 +53,7 @@ export async function DELETE(
     await requireProfile();
     const { id } = await params;
     
-    await prisma.course.delete({
+    await prisma.sATScore.delete({
       where: { id },
     });
     
@@ -60,7 +62,8 @@ export async function DELETE(
     if (error instanceof Error && error.message === "Profile not found") {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    console.error("Error deleting course:", error);
-    return NextResponse.json({ error: "Failed to delete course" }, { status: 500 });
+    console.error("Error deleting SAT score:", error);
+    return NextResponse.json({ error: "Failed to delete SAT score" }, { status: 500 });
   }
 }
+

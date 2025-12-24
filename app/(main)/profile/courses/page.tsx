@@ -1,0 +1,282 @@
+"use client";
+
+import React, { useState } from "react";
+import Link from "next/link";
+import { 
+  GraduationCap, 
+  ChevronLeft,
+  Plus,
+  Trash2,
+  Pencil,
+  Filter,
+} from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { Modal } from "@/components/ui/Modal";
+import { cn } from "@/lib/utils";
+import { useProfile } from "@/lib/context/ProfileContext";
+import { CourseForm } from "@/components/profile";
+import { calculateGPA, formatGPA } from "@/lib/gpa-calculator";
+
+type FilterLevel = "all" | "ap" | "honors" | "regular";
+
+export default function CoursesPage() {
+  const { profile, isLoading, error, refreshProfile } = useProfile();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCourse, setEditingCourse] = useState<Record<string, unknown> | null>(null);
+  const [filterLevel, setFilterLevel] = useState<FilterLevel>("all");
+
+  const courses = profile?.courses || [];
+  const gpaResult = calculateGPA(courses);
+
+  // Filter courses
+  const filteredCourses = courses.filter(course => {
+    if (filterLevel === "all") return true;
+    if (filterLevel === "ap") return course.level === "ap" || course.level === "ib" || course.level === "college";
+    if (filterLevel === "honors") return course.level === "honors";
+    if (filterLevel === "regular") return course.level === "regular" || !course.level;
+    return true;
+  });
+
+  // Group by grade level
+  const coursesByGrade = filteredCourses.reduce((acc, course) => {
+    const grade = course.gradeLevel || "Other";
+    if (!acc[grade]) acc[grade] = [];
+    acc[grade].push(course);
+    return acc;
+  }, {} as Record<string, typeof courses>);
+
+  const gradeOrder = ["9th", "10th", "11th", "12th", "Other"];
+  const sortedGrades = Object.keys(coursesByGrade).sort(
+    (a, b) => gradeOrder.indexOf(a) - gradeOrder.indexOf(b)
+  );
+
+  const handleSaveCourse = async (data: Record<string, unknown>) => {
+    const isEdit = !!editingCourse?.id;
+    const response = await fetch(
+      isEdit ? `/api/profile/courses/${editingCourse.id}` : "/api/profile/courses",
+      {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      }
+    );
+    if (response.ok) {
+      await refreshProfile();
+      setIsModalOpen(false);
+      setEditingCourse(null);
+    }
+  };
+
+  const handleDeleteCourse = async (id: string) => {
+    await fetch(`/api/profile/courses/${id}`, { method: "DELETE" });
+    refreshProfile();
+  };
+
+  const openAddModal = () => {
+    setEditingCourse(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (course: Record<string, unknown>) => {
+    setEditingCourse(course);
+    setIsModalOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+        <p className="text-text-muted mb-4">Failed to load profile</p>
+        <Button onClick={() => window.location.reload()}>Retry</Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Header */}
+      <div className="mb-6">
+        <Link 
+          href="/profile" 
+          className="inline-flex items-center gap-1.5 text-sm text-text-muted hover:text-accent-primary mb-4 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+          Back to Profile
+        </Link>
+        
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-accent-surface rounded-xl flex items-center justify-center text-accent-primary">
+              <GraduationCap className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="font-display font-bold text-2xl text-text-main">Courses</h1>
+              <p className="text-text-muted">Your coursework and academic record</p>
+            </div>
+          </div>
+          <Button onClick={openAddModal}>
+            <Plus className="w-4 h-4" />
+            Add Course
+          </Button>
+        </div>
+      </div>
+
+      {/* GPA Summary Bar */}
+      <div className="bg-white border border-border-subtle rounded-[16px] p-5 mb-6 shadow-card">
+        <div className="flex flex-wrap items-center gap-6 md:gap-10">
+          <div>
+            <div className="text-xs text-text-muted uppercase tracking-wider mb-0.5">Unweighted GPA</div>
+            <div className="text-2xl font-mono font-bold text-accent-primary">{formatGPA(gpaResult.unweighted)}</div>
+          </div>
+          <div>
+            <div className="text-xs text-text-muted uppercase tracking-wider mb-0.5">Weighted GPA</div>
+            <div className="text-2xl font-mono font-bold text-accent-primary">{formatGPA(gpaResult.weighted)}</div>
+          </div>
+          <div className="hidden md:block h-10 w-px bg-border-subtle" />
+          <div className="flex gap-4">
+            <div className="text-center">
+              <div className="text-lg font-bold text-text-main">{gpaResult.courseCount}</div>
+              <div className="text-xs text-text-muted">Courses</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-red-600">{gpaResult.apCount}</div>
+              <div className="text-xs text-text-muted">AP/IB</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-blue-600">{gpaResult.honorsCount}</div>
+              <div className="text-xs text-text-muted">Honors</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 mb-6">
+        <Filter className="w-4 h-4 text-text-muted" />
+        <div className="flex gap-1">
+          {[
+            { value: "all", label: "All" },
+            { value: "ap", label: "AP/IB" },
+            { value: "honors", label: "Honors" },
+            { value: "regular", label: "Regular" },
+          ].map(({ value, label }) => (
+            <button
+              key={value}
+              onClick={() => setFilterLevel(value as FilterLevel)}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium rounded-lg transition-colors",
+                filterLevel === value
+                  ? "bg-accent-primary text-white"
+                  : "text-text-muted hover:bg-bg-sidebar"
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Course List */}
+      {courses.length === 0 ? (
+        <div className="bg-white border border-border-subtle rounded-[20px] p-12 text-center shadow-card">
+          <GraduationCap className="w-12 h-12 text-text-light mx-auto mb-4" />
+          <h3 className="font-display font-bold text-lg text-text-main mb-2">No courses yet</h3>
+          <p className="text-text-muted mb-6">Add your courses to calculate your GPA automatically</p>
+          <Button onClick={openAddModal}>
+            <Plus className="w-4 h-4" />
+            Add Your First Course
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {sortedGrades.map(grade => (
+            <div key={grade}>
+              <h3 className="font-display font-bold text-text-main mb-3 flex items-center gap-2">
+                {grade === "Other" ? "Other Courses" : `${grade} Grade`}
+                <span className="text-sm font-normal text-text-muted">
+                  ({coursesByGrade[grade].length})
+                </span>
+              </h3>
+              <div className="bg-white border border-border-subtle rounded-[16px] overflow-hidden shadow-card">
+                {coursesByGrade[grade].map((course, i) => (
+                  <div 
+                    key={course.id}
+                    className={cn(
+                      "flex items-center justify-between p-4 group hover:bg-bg-sidebar/50 transition-colors",
+                      i !== coursesByGrade[grade].length - 1 && "border-b border-border-subtle"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      {course.level && course.level !== "regular" && (
+                        <span className={cn(
+                          "text-[10px] font-bold uppercase px-2 py-1 rounded shrink-0",
+                          course.level === "ap" && "bg-red-100 text-red-600",
+                          course.level === "ib" && "bg-purple-100 text-purple-600",
+                          course.level === "honors" && "bg-blue-100 text-blue-600",
+                          course.level === "college" && "bg-green-100 text-green-600",
+                        )}>
+                          {course.level}
+                        </span>
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-medium text-text-main truncate">{course.name}</div>
+                        {course.subject && (
+                          <div className="text-xs text-text-muted">{course.subject}</div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                      {course.grade && (
+                        <span className="font-mono font-semibold text-accent-primary text-lg">
+                          {course.grade}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                          onClick={() => openEditModal(course)}
+                          className="p-2 text-text-muted hover:text-accent-primary hover:bg-accent-surface rounded-lg transition-colors"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteCourse(course.id)}
+                          className="p-2 text-text-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modal */}
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => { setIsModalOpen(false); setEditingCourse(null); }}
+        title={editingCourse ? "Edit Course" : "Add Course"}
+        description="Add a course to your academic record"
+        size="lg"
+      >
+        <CourseForm
+          initialData={editingCourse || undefined}
+          onSubmit={handleSaveCourse}
+          onCancel={() => { setIsModalOpen(false); setEditingCourse(null); }}
+        />
+      </Modal>
+    </>
+  );
+}
+

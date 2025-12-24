@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { 
   GraduationCap, 
@@ -8,87 +8,23 @@ import {
   Users, 
   Trophy, 
   FlaskConical,
-  Download, 
+  ChevronRight,
   MessageCircle,
-  Plus,
-  Check,
-  X,
-  Pencil,
-  Trash2,
-  ChevronDown,
-  ChevronUp
+  Sparkles,
+  CheckCircle2,
+  Circle,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/lib/context/ProfileContext";
+import { calculateGPA, formatGPA } from "@/lib/gpa-calculator";
 
 // =============================================================================
-// TYPES (matching Prisma schema)
+// MAIN PROFILE OVERVIEW PAGE
 // =============================================================================
 
-interface ProfileData {
-  id: string;
-  firstName: string | null;
-  preferredName: string | null;
-  aboutMe: {
-    story: string | null;
-    interests: string[] | null;
-    values: string[] | null;
-    personality: string | null;
-  } | null;
-  academics: {
-    gpaUnweighted: number | null;
-    gpaWeighted: number | null;
-    classRank: number | null;
-    classSize: number | null;
-  } | null;
-  testing: {
-    satTotal: number | null;
-    satMath: number | null;
-    satReading: number | null;
-    actComposite: number | null;
-    actMath: number | null;
-    actEnglish: number | null;
-    apScores: Array<{ subject: string; score: number }>;
-    subjectTests: Array<{ subject: string; score: number }>;
-  } | null;
-  courses: Array<{
-    id: string;
-    name: string;
-    grade: string | null;
-    type: string | null;
-  }>;
-  activities: Array<{
-    id: string;
-    title: string;
-    organization: string | null;
-    yearsActive: string | null;
-    hoursPerWeek: number | null;
-    description: string | null;
-    isSpike: boolean;
-    isLeadership: boolean;
-  }>;
-  awards: Array<{
-    id: string;
-    title: string;
-    level: string | null;
-    year: number | null;
-  }>;
-  programs: Array<{
-    id: string;
-    name: string;
-    status: string | null;
-    year: number | null;
-  }>;
-}
-
-// =============================================================================
-// MAIN PAGE
-// =============================================================================
-
-export default function ProfilePage() {
-  // Use global profile context instead of fetching per-page
-  const { profile, isLoading, error, refreshProfile } = useProfile();
+export default function ProfileOverviewPage() {
+  const { profile, isLoading, error } = useProfile();
 
   if (isLoading) {
     return (
@@ -107,66 +43,249 @@ export default function ProfilePage() {
     );
   }
 
+  // Calculate stats
+  const gpaResult = calculateGPA(profile?.courses || []);
+  const satScores = profile?.testing?.satScores || [];
+  const actScores = profile?.testing?.actScores || [];
+  const bestSAT = satScores.length > 0 ? Math.max(...satScores.map(s => s.total)) : null;
+  const bestACT = actScores.length > 0 ? Math.max(...actScores.map(s => s.composite)) : null;
+  
+  const courseCount = profile?.courses?.length || 0;
+  const activityCount = profile?.activities?.length || 0;
+  const awardCount = profile?.awards?.length || 0;
+  const programCount = profile?.programs?.length || 0;
+
+  // Profile completeness
+  const completenessItems = [
+    { label: "About Me", done: !!profile?.aboutMe?.story },
+    { label: "Courses", done: courseCount >= 5 },
+    { label: "Test Scores", done: satScores.length > 0 || actScores.length > 0 },
+    { label: "Activities", done: activityCount >= 3 },
+    { label: "Awards", done: awardCount >= 1 },
+  ];
+  const completedCount = completenessItems.filter(i => i.done).length;
+  const completenessPercent = Math.round((completedCount / completenessItems.length) * 100);
+
   return (
     <>
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 gap-4">
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 gap-4">
         <div>
           <h1 className="font-display font-bold text-3xl text-text-main mb-2">Your Profile</h1>
           <p className="text-text-muted">Your academic and extracurricular snapshot.</p>
         </div>
-        <div className="flex gap-3">
-          <Button variant="secondary">
-            <Download className="w-4 h-4" />
-            Export PDF
-          </Button>
+      </div>
+
+      {/* Top Row: Key Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <StatCard 
+          label="Unweighted GPA" 
+          value={formatGPA(gpaResult.unweighted)} 
+          subtext={courseCount > 0 ? `from ${courseCount} courses` : undefined}
+          accent
+        />
+        <StatCard 
+          label="Weighted GPA" 
+          value={formatGPA(gpaResult.weighted)} 
+          subtext={gpaResult.apCount > 0 ? `${gpaResult.apCount} AP/IB courses` : undefined}
+          accent
+        />
+        <StatCard 
+          label="Best SAT" 
+          value={bestSAT?.toString() || "—"} 
+          subtext={satScores.length > 0 ? `${satScores.length} attempt${satScores.length > 1 ? "s" : ""}` : undefined}
+        />
+        <StatCard 
+          label="Best ACT" 
+          value={bestACT?.toString() || "—"} 
+          subtext={actScores.length > 0 ? `${actScores.length} attempt${actScores.length > 1 ? "s" : ""}` : undefined}
+        />
+      </div>
+
+      {/* About Me + Completeness Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* About Me */}
+        <div className="lg:col-span-2">
+          <AboutMeCard aboutMe={profile?.aboutMe} />
+        </div>
+
+        {/* Profile Completeness */}
+        <div className="bg-white border border-border-subtle rounded-[20px] p-6 shadow-card">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-display font-bold text-lg text-text-main">Profile Completeness</h3>
+            <span className="text-2xl font-bold text-accent-primary">{completenessPercent}%</span>
+          </div>
+          
+          {/* Progress bar */}
+          <div className="h-2 bg-bg-sidebar rounded-full mb-5 overflow-hidden">
+            <div 
+              className="h-full bg-accent-primary rounded-full transition-all duration-500"
+              style={{ width: `${completenessPercent}%` }}
+            />
+          </div>
+
+          <div className="space-y-2.5">
+            {completenessItems.map((item, i) => (
+              <div key={i} className="flex items-center gap-2.5">
+                {item.done ? (
+                  <CheckCircle2 className="w-4 h-4 text-accent-primary" />
+                ) : (
+                  <Circle className="w-4 h-4 text-border-medium" />
+                )}
+                <span className={cn(
+                  "text-sm",
+                  item.done ? "text-text-main" : "text-text-muted"
+                )}>
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Subtle Chat Prompt */}
-      <Link 
-        href="/advisor?mode=profile" 
-        className="flex items-center gap-2 text-sm text-text-muted hover:text-accent-primary transition-colors mb-6 group"
-      >
-        <MessageCircle className="w-4 h-4" />
-        <span>Need help building your profile? <span className="text-accent-primary group-hover:underline">Chat with your advisor →</span></span>
-      </Link>
+      {/* Section Cards Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <SectionCard
+          icon={GraduationCap}
+          title="Courses"
+          description="Your coursework and GPA"
+          href="/profile/courses"
+          stats={[
+            { label: "Courses", value: courseCount },
+            { label: "AP/IB", value: gpaResult.apCount },
+            { label: "Honors", value: gpaResult.honorsCount },
+          ]}
+          isEmpty={courseCount === 0}
+          emptyMessage="Add your courses to calculate GPA"
+        />
 
-      {/* About Me Section */}
-      <AboutMeCard aboutMe={profile?.aboutMe} />
+        <SectionCard
+          icon={PenTool}
+          title="Testing"
+          description="SAT, ACT, and AP scores"
+          href="/profile/testing"
+          stats={[
+            { label: "SAT", value: satScores.length },
+            { label: "ACT", value: actScores.length },
+            { label: "AP", value: profile?.testing?.apScores?.length || 0 },
+          ]}
+          isEmpty={satScores.length === 0 && actScores.length === 0}
+          emptyMessage="Add your test scores"
+        />
 
-      {/* Profile Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <AcademicsCard academics={profile?.academics} onRefresh={refreshProfile} />
-        <TestingCard testing={profile?.testing} onRefresh={refreshProfile} />
-        <ActivitiesCard activities={profile?.activities || []} onRefresh={refreshProfile} />
-        <AwardsCard awards={profile?.awards || []} onRefresh={refreshProfile} />
-        <ProgramsCard programs={profile?.programs || []} onRefresh={refreshProfile} />
+        <SectionCard
+          icon={Users}
+          title="Activities"
+          description="Extracurriculars and involvement"
+          href="/profile/activities"
+          stats={[
+            { label: "Total", value: activityCount },
+            { label: "Leadership", value: profile?.activities?.filter(a => a.isLeadership).length || 0 },
+            { label: "Spike", value: profile?.activities?.filter(a => a.isSpike).length || 0 },
+          ]}
+          isEmpty={activityCount === 0}
+          emptyMessage="Add your activities"
+        />
+
+        <SectionCard
+          icon={Trophy}
+          title="Awards"
+          description="Honors and recognitions"
+          href="/profile/awards"
+          stats={[
+            { label: "Total", value: awardCount },
+          ]}
+          isEmpty={awardCount === 0}
+          emptyMessage="Add your awards"
+        />
+
+        <SectionCard
+          icon={FlaskConical}
+          title="Programs"
+          description="Summer programs and research"
+          href="/profile/programs"
+          stats={[
+            { label: "Total", value: programCount },
+          ]}
+          isEmpty={programCount === 0}
+          emptyMessage="Add programs you've done"
+        />
+      </div>
+
+      {/* Chat Prompt */}
+      <div className="mt-8 bg-bg-sidebar/50 border border-border-subtle rounded-xl p-5 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 bg-accent-surface text-accent-primary rounded-xl flex items-center justify-center">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-medium text-text-main">Need help with your profile?</div>
+            <div className="text-sm text-text-muted">Chat with your advisor for personalized guidance</div>
+          </div>
+        </div>
+        <Link href="/advisor?mode=profile">
+          <Button variant="secondary">
+            <MessageCircle className="w-4 h-4" />
+            Chat with Advisor
+          </Button>
+        </Link>
       </div>
     </>
   );
 }
 
 // =============================================================================
-// ABOUT ME CARD
+// COMPONENTS
 // =============================================================================
 
+function StatCard({ 
+  label, 
+  value, 
+  subtext,
+  accent,
+}: { 
+  label: string; 
+  value: string; 
+  subtext?: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className={cn(
+      "rounded-[16px] p-5 border",
+      accent 
+        ? "bg-accent-surface/50 border-accent-border" 
+        : "bg-white border-border-subtle shadow-card"
+    )}>
+      <div className="text-xs text-text-muted uppercase tracking-wider mb-1">{label}</div>
+      <div className={cn(
+        "text-3xl font-mono font-bold",
+        accent ? "text-accent-primary" : "text-text-main"
+      )}>
+        {value}
+      </div>
+      {subtext && (
+        <div className="text-xs text-text-muted mt-1">{subtext}</div>
+      )}
+    </div>
+  );
+}
+
 interface AboutMe {
-  story: string | null;
-  interests: string[] | null;
-  values: string[] | null;
-  personality: string | null;
+  story?: string | null;
+  interests?: string[] | null;
+  values?: string[] | null;
 }
 
 function AboutMeCard({ aboutMe }: { aboutMe: AboutMe | null | undefined }) {
   if (!aboutMe?.story) {
     return (
-      <div className="bg-bg-sidebar border border-border-subtle rounded-[20px] p-6 mb-6">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-text-muted border border-border-subtle">
+      <div className="bg-bg-sidebar border border-border-subtle rounded-[20px] p-6 h-full flex items-center">
+        <div className="flex items-center gap-4 w-full">
+          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-text-muted border border-border-subtle shrink-0">
             <MessageCircle className="w-6 h-6" />
           </div>
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             <h3 className="font-display font-bold text-lg text-text-main mb-1">Tell us about yourself</h3>
             <p className="text-sm text-text-muted">Beyond grades and scores — who are you?</p>
           </div>
@@ -182,373 +301,80 @@ function AboutMeCard({ aboutMe }: { aboutMe: AboutMe | null | undefined }) {
   }
 
   return (
-    <div className="bg-white border border-border-subtle rounded-[20px] p-6 shadow-card mb-6">
+    <div className="bg-white border border-border-subtle rounded-[20px] p-6 shadow-card h-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-display font-bold text-lg text-text-main">About Me</h3>
+        <Link href="/advisor?mode=story" className="text-sm text-accent-primary hover:underline">
+          Edit
+        </Link>
       </div>
-      <p className="text-sm text-text-main leading-relaxed mb-4">{aboutMe.story}</p>
+      <p className="text-sm text-text-main leading-relaxed mb-4 line-clamp-3">{aboutMe.story}</p>
       
-      <div className="flex flex-wrap gap-2 mb-4">
-        {aboutMe.values?.map((value, i) => (
+      <div className="flex flex-wrap gap-2">
+        {aboutMe.values?.slice(0, 3).map((value, i) => (
           <span key={i} className="px-3 py-1 bg-accent-surface text-accent-primary text-xs font-medium rounded-full">
             {value}
           </span>
         ))}
-        {aboutMe.interests?.map((interest, i) => (
+        {aboutMe.interests?.slice(0, 3).map((interest, i) => (
           <span key={i} className="px-3 py-1 bg-bg-sidebar text-text-muted text-xs font-medium rounded-full">
             {interest}
           </span>
         ))}
       </div>
-
-      {aboutMe.personality && (
-        <div className="text-xs text-text-muted italic">"{aboutMe.personality}"</div>
-      )}
     </div>
   );
 }
 
-// =============================================================================
-// ACADEMICS CARD
-// =============================================================================
-
-function AcademicsCard({ 
-  academics, 
-  onRefresh 
-}: { 
-  academics: ProfileData["academics"] | undefined;
-  onRefresh: () => void;
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  href,
+  stats,
+  isEmpty,
+  emptyMessage,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  href: string;
+  stats: Array<{ label: string; value: number }>;
+  isEmpty?: boolean;
+  emptyMessage?: string;
 }) {
-  const hasData = academics?.gpaUnweighted || academics?.gpaWeighted;
-
-  return (
-    <ProfileCard icon={GraduationCap} title="Academics">
-      {hasData ? (
-        <>
-          {academics?.gpaUnweighted && (
-            <DataRow label="GPA (Unweighted)" value={academics.gpaUnweighted.toFixed(2)} />
-          )}
-          {academics?.gpaWeighted && (
-            <DataRow label="GPA (Weighted)" value={academics.gpaWeighted.toFixed(2)} />
-          )}
-          {academics?.classRank && academics?.classSize && (
-            <DataRow label="Class Rank" value={`${academics.classRank} / ${academics.classSize}`} />
-          )}
-        </>
-      ) : (
-        <EmptyState message="No academics data yet" href="/advisor?mode=profile" />
-      )}
-    </ProfileCard>
-  );
-}
-
-// =============================================================================
-// TESTING CARD
-// =============================================================================
-
-function TestingCard({ 
-  testing, 
-  onRefresh 
-}: { 
-  testing: ProfileData["testing"] | undefined;
-  onRefresh: () => void;
-}) {
-  const hasData = testing?.satTotal || testing?.actComposite;
-
-  return (
-    <ProfileCard icon={PenTool} title="Testing">
-      {hasData ? (
-        <>
-          {testing?.satTotal && (
-            <DataRow 
-              label="SAT" 
-              value={testing.satTotal.toString()} 
-              subValue={testing.satMath && testing.satReading 
-                ? `M: ${testing.satMath} | V: ${testing.satReading}` 
-                : undefined
-              }
-            />
-          )}
-          {testing?.actComposite && (
-            <DataRow label="ACT" value={testing.actComposite.toString()} />
-          )}
-          
-          {/* AP Scores */}
-          {testing?.apScores && testing.apScores.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border-subtle">
-              <div className="text-xs font-medium text-text-muted uppercase tracking-wider mb-3">AP Scores</div>
-              <div className="space-y-2">
-                {testing.apScores.map((ap, i) => (
-                  <div key={i} className="flex items-center justify-between text-sm py-1.5">
-                    <span className="text-text-main">{ap.subject}</span>
-                    <span className="font-mono font-semibold text-accent-primary">{ap.score}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <EmptyState message="No test scores yet" href="/advisor?mode=profile" />
-      )}
-    </ProfileCard>
-  );
-}
-
-// =============================================================================
-// ACTIVITIES CARD
-// =============================================================================
-
-function ActivitiesCard({ 
-  activities,
-  onRefresh 
-}: { 
-  activities: ProfileData["activities"];
-  onRefresh: () => void;
-}) {
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-
-  const handleDelete = async (id: string) => {
-    await fetch(`/api/profile/activities/${id}`, { method: "DELETE" });
-    onRefresh();
-  };
-
-  return (
-    <ProfileCard icon={Users} title="Activities" className="lg:row-span-2">
-      {activities.length > 0 ? (
-        <div className="space-y-3">
-          {activities.map((activity) => (
-            <div 
-              key={activity.id} 
-              className={cn(
-                "border border-border-subtle rounded-xl p-4 transition-all",
-                activity.isSpike && "border-accent-primary/30 bg-accent-surface/20"
-              )}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-text-main">{activity.title}</span>
-                    {activity.isSpike && (
-                      <span className="text-[10px] font-bold uppercase text-accent-primary bg-accent-surface px-1.5 py-0.5 rounded">Spike</span>
-                    )}
-                  </div>
-                  {activity.organization && (
-                    <div className="text-sm text-text-muted">{activity.organization}</div>
-                  )}
-                  <div className="text-xs text-text-light mt-1">
-                    {activity.yearsActive && `${activity.yearsActive} • `}
-                    {activity.hoursPerWeek && `${activity.hoursPerWeek} hr/wk`}
-                  </div>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button 
-                    onClick={() => setExpandedId(expandedId === activity.id ? null : activity.id)}
-                    className="p-1.5 text-text-muted hover:text-text-main hover:bg-bg-sidebar rounded-lg transition-colors"
-                  >
-                    {expandedId === activity.id ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                  </button>
-                  <button 
-                    onClick={() => handleDelete(activity.id)}
-                    className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {expandedId === activity.id && activity.description && (
-                <div className="mt-3 pt-3 border-t border-border-subtle text-sm text-text-main">
-                  {activity.description}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <EmptyState message="No activities added yet" href="/advisor?mode=profile" />
-      )}
-      <AddButton label="Add activity" href="/advisor?mode=profile" />
-    </ProfileCard>
-  );
-}
-
-// =============================================================================
-// AWARDS CARD
-// =============================================================================
-
-function AwardsCard({ 
-  awards, 
-  onRefresh 
-}: { 
-  awards: ProfileData["awards"];
-  onRefresh: () => void;
-}) {
-  const handleDelete = async (id: string) => {
-    await fetch(`/api/profile/awards/${id}`, { method: "DELETE" });
-    onRefresh();
-  };
-
-  return (
-    <ProfileCard icon={Trophy} title="Awards">
-      {awards.length > 0 ? (
-        <div className="space-y-3">
-          {awards.map((award) => (
-            <div 
-              key={award.id} 
-              className="flex items-center justify-between py-2 border-b border-border-subtle last:border-0 group"
-            >
-              <div>
-                <div className="font-medium text-text-main">{award.title}</div>
-                <div className="text-xs text-text-muted">
-                  {award.level && `${award.level} • `}{award.year}
-                </div>
-              </div>
-              <button 
-                onClick={() => handleDelete(award.id)}
-                className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <EmptyState message="No awards added yet" href="/advisor?mode=profile" />
-      )}
-      <AddButton label="Add award" href="/advisor?mode=profile" />
-    </ProfileCard>
-  );
-}
-
-// =============================================================================
-// PROGRAMS CARD
-// =============================================================================
-
-function ProgramsCard({ 
-  programs, 
-  onRefresh 
-}: { 
-  programs: ProfileData["programs"];
-  onRefresh: () => void;
-}) {
-  const handleDelete = async (id: string) => {
-    await fetch(`/api/profile/programs/${id}`, { method: "DELETE" });
-    onRefresh();
-  };
-
-  const getStatusStyle = (status: string | null) => {
-    switch (status?.toLowerCase()) {
-      case "completed":
-        return "bg-green-50 text-green-700";
-      case "applying":
-        return "bg-accent-surface text-accent-primary";
-      case "accepted":
-        return "bg-green-100 text-green-800";
-      case "rejected":
-        return "bg-red-50 text-red-600";
-      default:
-        return "bg-bg-sidebar text-text-muted";
-    }
-  };
-
-  return (
-    <ProfileCard icon={FlaskConical} title="Programs">
-      {programs.length > 0 ? (
-        <div className="space-y-3">
-          {programs.map((program) => (
-            <div 
-              key={program.id} 
-              className="flex items-center justify-between py-2 border-b border-border-subtle last:border-0 group"
-            >
-              <div>
-                <div className="font-medium text-text-main">{program.name}</div>
-                <div className="text-xs text-text-muted">{program.year}</div>
-              </div>
-              <div className="flex items-center gap-2">
-                {program.status && (
-                  <span className={cn("text-xs font-medium px-2 py-0.5 rounded", getStatusStyle(program.status))}>
-                    {program.status}
-                  </span>
-                )}
-                <button 
-                  onClick={() => handleDelete(program.id)}
-                  className="p-1.5 text-text-muted hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <EmptyState message="No programs added yet" href="/advisor?mode=profile" />
-      )}
-      <AddButton label="Add program" href="/advisor?mode=profile" />
-    </ProfileCard>
-  );
-}
-
-// =============================================================================
-// SHARED COMPONENTS
-// =============================================================================
-
-function ProfileCard({ icon: Icon, title, children, className }: { 
-  icon: React.ElementType; 
-  title: string; 
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={cn(
-      "bg-white border border-border-subtle rounded-[20px] p-6 shadow-card hover:border-accent-border transition-all",
-      className
-    )}>
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-bg-sidebar rounded-lg flex items-center justify-center text-text-muted">
-          <Icon className="w-5 h-5" />
-        </div>
-        <div className="font-display font-bold text-lg text-text-main">{title}</div>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function DataRow({ label, value, subValue }: { label: string; value: string; subValue?: string }) {
-  return (
-    <div className="flex justify-between items-center py-3 border-b border-border-subtle last:border-0">
-      <span className="text-text-muted text-[15px]">{label}</span>
-      <div className="text-right">
-        <span className="font-mono font-semibold text-text-main">{value}</span>
-        {subValue && <div className="text-xs text-text-muted">{subValue}</div>}
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ message, href }: { message: string; href: string }) {
-  return (
-    <div className="text-center py-6 text-text-muted text-sm">
-      <p className="mb-3">{message}</p>
-      <Link href={href}>
-        <Button size="sm" variant="secondary">
-          <MessageCircle className="w-4 h-4" />
-          Add via Chat
-        </Button>
-      </Link>
-    </div>
-  );
-}
-
-function AddButton({ label, href }: { label: string; href: string }) {
   return (
     <Link 
       href={href}
-      className="flex items-center gap-1.5 mt-4 text-sm text-accent-primary hover:text-accent-primary/80 font-medium transition-colors"
+      className="group bg-white border border-border-subtle rounded-[20px] p-6 shadow-card hover:border-accent-primary hover:shadow-lg transition-all"
     >
-      <Plus className="w-4 h-4" />
-      {label}
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-bg-sidebar rounded-xl flex items-center justify-center text-text-muted group-hover:bg-accent-surface group-hover:text-accent-primary transition-colors">
+            <Icon className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-display font-bold text-text-main">{title}</h3>
+            <p className="text-xs text-text-muted">{description}</p>
+          </div>
+        </div>
+        <ChevronRight className="w-5 h-5 text-text-light group-hover:text-accent-primary group-hover:translate-x-1 transition-all" />
+      </div>
+
+      {isEmpty ? (
+        <div className="text-sm text-text-muted py-4 text-center bg-bg-sidebar/50 rounded-xl">
+          {emptyMessage}
+        </div>
+      ) : (
+        <div className="flex gap-4">
+          {stats.map((stat, i) => (
+            <div key={i} className="text-center">
+              <div className="text-xl font-bold text-text-main">{stat.value}</div>
+              <div className="text-xs text-text-muted">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
     </Link>
   );
 }

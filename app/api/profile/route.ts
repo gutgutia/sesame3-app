@@ -25,8 +25,10 @@ export async function GET() {
         academics: true,
         testing: {
           include: {
-            apScores: true,
-            subjectTests: true,
+            satScores: { orderBy: { testDate: "desc" } },
+            actScores: { orderBy: { testDate: "desc" } },
+            apScores: { orderBy: { year: "desc" } },
+            subjectTests: { orderBy: { testDate: "desc" } },
           },
         },
         courses: {

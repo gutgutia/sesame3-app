@@ -34,16 +34,35 @@ export interface ProfileData {
     honorsCourseCount?: number | null;
   } | null;
   testing?: {
-    satTotal?: number | null;
-    satMath?: number | null;
-    satReading?: number | null;
-    actComposite?: number | null;
-    actEnglish?: number | null;
-    actMath?: number | null;
-    actReading?: number | null;
-    actScience?: number | null;
     psatTotal?: number | null;
-    apScores?: Array<{ subject: string; score: number; year?: number }>;
+    psatMath?: number | null;
+    psatReading?: number | null;
+    psatDate?: string | null;
+    nmsqtQualified?: boolean | null;
+    satScores?: Array<{
+      id: string;
+      total: number;
+      math: number;
+      reading: number;
+      essay?: number | null;
+      testDate: string;
+      isPrimary?: boolean;
+      isSuperscored?: boolean;
+    }>;
+    actScores?: Array<{
+      id: string;
+      composite: number;
+      english: number;
+      math: number;
+      reading: number;
+      science: number;
+      writing?: number | null;
+      testDate: string;
+      isPrimary?: boolean;
+      isSuperscored?: boolean;
+    }>;
+    apScores?: Array<{ id: string; subject: string; score: number; year: number }>;
+    subjectTests?: Array<{ id: string; subject: string; score: number; testDate?: string | null }>;
   } | null;
   activities?: Array<{
     id: string;

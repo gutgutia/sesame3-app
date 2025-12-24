@@ -3,8 +3,8 @@ import { prisma } from "@/lib/db";
 import { requireProfile } from "@/lib/auth";
 
 /**
- * PUT /api/profile/courses/[id]
- * Update a course
+ * PUT /api/profile/testing/act/[id]
+ * Update an ACT score
  */
 export async function PUT(
   request: NextRequest,
@@ -15,33 +15,39 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
     
-    const course = await prisma.course.update({
+    // Calculate composite from sections
+    const composite = Math.round(
+      ((body.english || 0) + (body.math || 0) + (body.reading || 0) + (body.science || 0)) / 4
+    );
+    
+    const actScore = await prisma.aCTScore.update({
       where: { id },
       data: {
-        name: body.name,
-        subject: body.subject,
-        level: body.level,
-        status: body.status,
-        gradeLevel: body.gradeLevel,
-        grade: body.grade,
-        gradeNumeric: body.gradeNumeric,
-        credits: body.credits,
+        composite,
+        english: body.english,
+        math: body.math,
+        reading: body.reading,
+        science: body.science,
+        writing: body.writing,
+        testDate: new Date(body.testDate),
+        isSuperscored: body.isSuperscored || false,
+        isPrimary: body.isPrimary || false,
       },
     });
     
-    return NextResponse.json(course);
+    return NextResponse.json(actScore);
   } catch (error) {
     if (error instanceof Error && error.message === "Profile not found") {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    console.error("Error updating course:", error);
-    return NextResponse.json({ error: "Failed to update course" }, { status: 500 });
+    console.error("Error updating ACT score:", error);
+    return NextResponse.json({ error: "Failed to update ACT score" }, { status: 500 });
   }
 }
 
 /**
- * DELETE /api/profile/courses/[id]
- * Delete a course
+ * DELETE /api/profile/testing/act/[id]
+ * Delete an ACT score
  */
 export async function DELETE(
   _request: NextRequest,
@@ -51,7 +57,7 @@ export async function DELETE(
     await requireProfile();
     const { id } = await params;
     
-    await prisma.course.delete({
+    await prisma.aCTScore.delete({
       where: { id },
     });
     
@@ -60,7 +66,8 @@ export async function DELETE(
     if (error instanceof Error && error.message === "Profile not found") {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
-    console.error("Error deleting course:", error);
-    return NextResponse.json({ error: "Failed to delete course" }, { status: 500 });
+    console.error("Error deleting ACT score:", error);
+    return NextResponse.json({ error: "Failed to delete ACT score" }, { status: 500 });
   }
 }
+

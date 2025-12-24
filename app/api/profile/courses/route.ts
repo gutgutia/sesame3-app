@@ -5,28 +5,15 @@ import { requireProfile } from "@/lib/auth";
 /**
  * GET /api/profile/courses
  * Get all courses for the current user
- * Query params:
- *   - status: "completed" | "in_progress" | "planned" (optional filter)
  */
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const profileId = await requireProfile();
-    const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status");
-    
-    const where: { studentProfileId: string; status?: string } = {
-      studentProfileId: profileId,
-    };
-    
-    if (status && ["completed", "in_progress", "planned"].includes(status)) {
-      where.status = status;
-    }
     
     const courses = await prisma.course.findMany({
-      where,
+      where: { studentProfileId: profileId },
       orderBy: [
-        { status: "asc" }, // completed, in_progress, planned
-        { academicYear: "desc" },
+        { gradeLevel: "asc" },
         { name: "asc" },
       ],
     });
@@ -43,7 +30,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/profile/courses
- * Create a new course
+ * Add a new course
  */
 export async function POST(request: NextRequest) {
   try {
@@ -55,15 +42,11 @@ export async function POST(request: NextRequest) {
         studentProfileId: profileId,
         name: body.name,
         subject: body.subject,
-        level: body.level,
+        level: body.level || "regular",
         status: body.status || "completed",
-        academicYear: body.academicYear,
-        semester: body.semester,
         gradeLevel: body.gradeLevel,
         grade: body.grade,
         gradeNumeric: body.gradeNumeric,
-        planningNotes: body.planningNotes,
-        isCore: body.isCore ?? false,
         credits: body.credits,
       },
     });
