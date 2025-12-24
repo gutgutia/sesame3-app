@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { 
   GraduationCap, 
@@ -9,21 +9,67 @@ import {
   Trash2,
   Pencil,
   Filter,
+  Upload,
+  ChevronDown,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/lib/context/ProfileContext";
-import { CourseForm } from "@/components/profile";
+import { CourseForm, TranscriptUploader, CourseReviewTable } from "@/components/profile";
 import { calculateGPA, formatGPA } from "@/lib/gpa-calculator";
 
+type AddMode = "single" | "transcript" | "review";
+
 type FilterLevel = "all" | "ap" | "honors" | "regular";
+
+interface ExtractedCourse {
+  name: string;
+  subject: string;
+  level: string;
+  gradeLevel: string;
+  grade?: string;
+  credits?: number;
+  isDuplicate?: boolean;
+  isPotentialDuplicate?: boolean;
+  matchType?: "exact" | "similar" | "new";
+  existingName?: string;
+}
+
+interface ExtractionResult {
+  courses: ExtractedCourse[];
+  studentName?: string;
+  schoolName?: string;
+  gpaUnweighted?: number;
+  gpaWeighted?: number;
+  totalExtracted: number;
+  duplicates: number;
+  potentialDuplicates: number;
+}
 
 export default function CoursesPage() {
   const { profile, isLoading, error, refreshProfile } = useProfile();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCourse, setEditingCourse] = useState<Record<string, unknown> | null>(null);
   const [filterLevel, setFilterLevel] = useState<FilterLevel>("all");
+  
+  // Add course modes
+  const [addMode, setAddMode] = useState<AddMode>("single");
+  const [showAddDropdown, setShowAddDropdown] = useState(false);
+  const [extractedData, setExtractedData] = useState<ExtractionResult | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowAddDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const courses = profile?.courses || [];
   const gpaResult = calculateGPA(courses);
@@ -72,14 +118,45 @@ export default function CoursesPage() {
     refreshProfile();
   };
 
-  const openAddModal = () => {
+  const openAddModal = (mode: AddMode = "single") => {
+    setAddMode(mode);
     setEditingCourse(null);
+    setExtractedData(null);
     setIsModalOpen(true);
+    setShowAddDropdown(false);
   };
 
   const openEditModal = (course: Record<string, unknown>) => {
+    setAddMode("single");
     setEditingCourse(course);
     setIsModalOpen(true);
+  };
+
+  const handleTranscriptExtracted = (result: ExtractionResult) => {
+    setExtractedData(result);
+    setAddMode("review");
+  };
+
+  const handleImportCourses = async (coursesToImport: ExtractedCourse[]) => {
+    const response = await fetch("/api/profile/courses/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ courses: coursesToImport }),
+    });
+    
+    if (response.ok) {
+      await refreshProfile();
+      setIsModalOpen(false);
+      setExtractedData(null);
+      setAddMode("single");
+    }
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingCourse(null);
+    setExtractedData(null);
+    setAddMode("single");
   };
 
   if (isLoading) {
@@ -121,10 +198,47 @@ export default function CoursesPage() {
               <p className="text-text-muted">Your coursework and academic record</p>
             </div>
           </div>
-          <Button onClick={openAddModal}>
-            <Plus className="w-4 h-4" />
-            Add Course
-          </Button>
+          
+          {/* Add Courses Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <Button onClick={() => setShowAddDropdown(!showAddDropdown)}>
+              <Plus className="w-4 h-4" />
+              Add Courses
+              <ChevronDown className={cn("w-4 h-4 transition-transform", showAddDropdown && "rotate-180")} />
+            </Button>
+            
+            {showAddDropdown && (
+              <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-xl border border-border-subtle shadow-lg z-50 overflow-hidden">
+                <button
+                  onClick={() => openAddModal("single")}
+                  className="w-full flex items-start gap-3 p-4 hover:bg-bg-sidebar transition-colors text-left"
+                >
+                  <div className="w-9 h-9 bg-accent-surface rounded-lg flex items-center justify-center text-accent-primary shrink-0">
+                    <Plus className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-text-main">Add Single Course</div>
+                    <div className="text-xs text-text-muted">Add one course at a time</div>
+                  </div>
+                </button>
+                
+                <div className="border-t border-border-subtle" />
+                
+                <button
+                  onClick={() => openAddModal("transcript")}
+                  className="w-full flex items-start gap-3 p-4 hover:bg-bg-sidebar transition-colors text-left"
+                >
+                  <div className="w-9 h-9 bg-purple-100 rounded-lg flex items-center justify-center text-purple-600 shrink-0">
+                    <Upload className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-medium text-text-main">Upload Transcript</div>
+                    <div className="text-xs text-text-muted">AI extracts all your courses</div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -188,11 +302,20 @@ export default function CoursesPage() {
         <div className="bg-white border border-border-subtle rounded-[20px] p-12 text-center shadow-card">
           <GraduationCap className="w-12 h-12 text-text-light mx-auto mb-4" />
           <h3 className="font-display font-bold text-lg text-text-main mb-2">No courses yet</h3>
-          <p className="text-text-muted mb-6">Add your courses to calculate your GPA automatically</p>
-          <Button onClick={openAddModal}>
-            <Plus className="w-4 h-4" />
-            Add Your First Course
-          </Button>
+          <p className="text-text-muted mb-6 max-w-md mx-auto">
+            Add your courses to calculate your GPA automatically. 
+            You can add them one at a time or upload your transcript.
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <Button variant="secondary" onClick={() => openAddModal("single")}>
+              <Plus className="w-4 h-4" />
+              Add Course Manually
+            </Button>
+            <Button onClick={() => openAddModal("transcript")}>
+              <Upload className="w-4 h-4" />
+              Upload Transcript
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-6">
@@ -265,16 +388,51 @@ export default function CoursesPage() {
       {/* Modal */}
       <Modal 
         isOpen={isModalOpen} 
-        onClose={() => { setIsModalOpen(false); setEditingCourse(null); }}
-        title={editingCourse ? "Edit Course" : "Add Course"}
-        description="Add a course to your academic record"
-        size="lg"
+        onClose={closeModal}
+        title={
+          editingCourse 
+            ? "Edit Course" 
+            : addMode === "transcript" 
+              ? "Upload Transcript" 
+              : addMode === "review"
+                ? "Review Extracted Courses"
+                : "Add Course"
+        }
+        description={
+          addMode === "transcript"
+            ? "Upload a photo or PDF of your transcript and we'll extract your courses automatically"
+            : addMode === "review"
+              ? "Review the courses we found and make any corrections before importing"
+              : "Add a course to your academic record"
+        }
+        size={addMode === "review" ? "xl" : "lg"}
       >
-        <CourseForm
-          initialData={editingCourse || undefined}
-          onSubmit={handleSaveCourse}
-          onCancel={() => { setIsModalOpen(false); setEditingCourse(null); }}
-        />
+        {addMode === "single" && (
+          <CourseForm
+            initialData={editingCourse || undefined}
+            onSubmit={handleSaveCourse}
+            onCancel={closeModal}
+          />
+        )}
+        
+        {addMode === "transcript" && (
+          <TranscriptUploader
+            onExtracted={handleTranscriptExtracted}
+            onCancel={closeModal}
+          />
+        )}
+        
+        {addMode === "review" && extractedData && (
+          <CourseReviewTable
+            courses={extractedData.courses}
+            studentName={extractedData.studentName}
+            schoolName={extractedData.schoolName}
+            gpaUnweighted={extractedData.gpaUnweighted}
+            gpaWeighted={extractedData.gpaWeighted}
+            onImport={handleImportCourses}
+            onCancel={closeModal}
+          />
+        )}
       </Modal>
     </>
   );

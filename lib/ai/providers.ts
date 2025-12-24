@@ -27,6 +27,7 @@ export const models = {
   // Google Gemini - Large context, good at synthesis
   google: {
     gemini3Pro: google("gemini-3-pro-preview"),
+    gemini3Flash: google("gemini-3-flash-preview"),
   },
   
   // Groq - Ultra-fast inference
@@ -58,6 +59,9 @@ export const modelFor = {
   
   // Long context processing (transcripts, documents)
   longContext: models.google.gemini3Pro,
+  
+  // Vision/OCR tasks (transcript extraction)
+  vision: models.google.gemini3Flash,
   
   // Summarization (cheap, good enough)
   summarization: models.openai.gpt5Mini,
