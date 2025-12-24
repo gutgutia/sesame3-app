@@ -43,27 +43,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
-    // Validate file type - Note: PDFs need to be converted to images first
+    // Validate file type
     const validImageTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
     const isPDF = file.type === "application/pdf";
     
     if (!validImageTypes.includes(file.type) && !isPDF) {
       return NextResponse.json({ 
-        error: "Invalid file type. Please upload a PNG, JPEG, or WebP image." 
+        error: "Invalid file type. Please upload a PDF, PNG, JPEG, or WebP file." 
       }, { status: 400 });
     }
 
-    if (isPDF) {
-      return NextResponse.json({ 
-        error: "PDF upload is not yet supported. Please take a screenshot or photo of your transcript instead." 
-      }, { status: 400 });
-    }
-
-    // Convert file to base64 data URL
     const bytes = await file.arrayBuffer();
-    const base64 = Buffer.from(bytes).toString("base64");
-    const mimeType = file.type as "image/jpeg" | "image/png" | "image/webp" | "image/gif";
-    const dataUrl = `data:${mimeType};base64,${base64}`;
+    
+    // Build file content - PDFs use 'file' type, images use 'image' type
+    const fileContent = isPDF
+      ? { type: "file" as const, data: Buffer.from(bytes), mediaType: "application/pdf" as const }
+      : { type: "image" as const, image: `data:${file.type};base64,${Buffer.from(bytes).toString("base64")}` };
 
     // Get existing courses for deduplication
     const existingCourses = await prisma.course.findMany({
@@ -79,10 +74,7 @@ export async function POST(request: NextRequest) {
         {
           role: "user",
           content: [
-            {
-              type: "image",
-              image: dataUrl,
-            },
+            fileContent,
             {
               type: "text",
               text: `Analyze this high school transcript and extract ALL courses listed.

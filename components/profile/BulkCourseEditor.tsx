@@ -116,9 +116,9 @@ export function BulkCourseEditor({ onSave, onCancel }: BulkCourseEditorProps) {
 
   const handleFileUpload = async (file: File) => {
     setUploadError(null);
-    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-    if (!validTypes.includes(file.type)) { setUploadError("Please upload an image (PNG, JPEG, WebP)"); return; }
-    if (file.size > 10 * 1024 * 1024) { setUploadError("File must be under 10MB"); return; }
+    const validTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+    if (!validTypes.includes(file.type)) { setUploadError("Please upload a PDF or image (PNG, JPEG, WebP)"); return; }
+    if (file.size > 20 * 1024 * 1024) { setUploadError("File must be under 20MB"); return; }
 
     setIsUploading(true);
     try {
@@ -190,13 +190,13 @@ export function BulkCourseEditor({ onSave, onCancel }: BulkCourseEditorProps) {
           >
             <input
               type="file"
-              accept=".png,.jpg,.jpeg,.webp"
+              accept=".pdf,.png,.jpg,.jpeg,.webp"
               onChange={handleFileSelect}
               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
             <Upload className={cn("w-10 h-10 mx-auto mb-4", isDragging ? "text-accent-primary" : "text-text-light")} />
             <p className="text-lg font-medium text-text-main">Upload your transcript</p>
-            <p className="text-sm text-text-muted mt-1">Drop an image or click to browse</p>
+            <p className="text-sm text-text-muted mt-1">PDF or image • Drop or click to browse</p>
           </div>
         )}
 
