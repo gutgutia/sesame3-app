@@ -20,6 +20,7 @@ import {
   recordUsage,
   getUserIdFromProfile,
 } from "@/lib/usage";
+import { getFeatureFlags } from "@/lib/config";
 
 export const maxDuration = 60; // Allow up to 60 seconds for streaming
 
@@ -142,11 +143,15 @@ export async function POST(request: NextRequest) {
     const encoder = new TextEncoder();
     let totalOutputTokens = 0;
     
+    // Check if widgets are enabled (feature flag)
+    const featureFlags = await getFeatureFlags();
+    
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send widget data first (if detected)
-          if (parserResult?.widget) {
+          // Send widget data first (if detected AND widgets are enabled)
+          // Note: Widgets are disabled for v1 - architecture is in place for future
+          if (featureFlags.enableWidgets && parserResult?.widget) {
             const widgetEvent = JSON.stringify({
               type: "widget",
               widget: parserResult.widget,
