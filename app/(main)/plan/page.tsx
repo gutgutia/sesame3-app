@@ -253,8 +253,8 @@ export default function PlanPage() {
           )}
         </div>
 
-        {/* Right Sidebar - 1/3 width */}
-        <div className="lg:col-span-1 space-y-5">
+        {/* Right Sidebar - 1/3 width, offset to align with cards not section titles */}
+        <div className="lg:col-span-1 space-y-5 lg:pt-10">
           {/* Quick Stats */}
           {goals.length > 0 && (
             <div className="bg-white border border-border-subtle rounded-[20px] p-5 shadow-card">
