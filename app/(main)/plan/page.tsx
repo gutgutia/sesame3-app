@@ -478,13 +478,16 @@ function TaskItem({
   };
 
   return (
-    <div className={cn("group", isSubtask && "ml-6")}>
-      <div className="flex items-center gap-2 py-1.5">
+    <div className="group">
+      <div className={cn(
+        "flex items-center gap-2 py-1.5",
+        isSubtask && "pl-8 border-l-2 border-border-subtle ml-2"
+      )}>
         {/* Expand/Collapse for tasks with subtasks */}
         {hasSubtasks && (
           <button
             onClick={() => setShowSubtasks(!showSubtasks)}
-            className="p-0.5 text-text-muted hover:text-text-main"
+            className="p-0.5 text-text-muted hover:text-text-main shrink-0"
           >
             <ChevronRight className={cn(
               "w-3 h-3 transition-transform",
@@ -492,7 +495,7 @@ function TaskItem({
             )} />
           </button>
         )}
-        {!hasSubtasks && !isSubtask && <div className="w-4" />}
+        {!hasSubtasks && !isSubtask && <div className="w-4 shrink-0" />}
         
         {/* Checkbox */}
         <button
@@ -514,24 +517,26 @@ function TaskItem({
         
         {/* Title */}
         <span className={cn(
-          "text-sm flex-1",
-          task.completed && "line-through text-text-muted"
+          "text-sm flex-1 min-w-0",
+          task.completed && "line-through text-text-muted",
+          isSubtask && "text-text-muted"
         )}>
           {task.title}
         </span>
         
-        {/* Due date */}
-        {task.dueDate && (
-          <span className="text-xs text-text-light">
-            {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-          </span>
-        )}
+        {/* Due date - fixed width for alignment */}
+        <span className="text-xs text-text-light w-14 text-right shrink-0">
+          {task.dueDate 
+            ? new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+            : ""
+          }
+        </span>
         
         {/* Add subtask button (only for top-level tasks) */}
         {!isSubtask && (
           <button
             onClick={() => onAddSubtask(task.id, task.title)}
-            className="p-1 text-text-light opacity-0 group-hover:opacity-100 hover:text-accent-primary transition-all"
+            className="p-1 text-text-light opacity-0 group-hover:opacity-100 hover:text-accent-primary transition-all shrink-0"
             title="Add subtask"
           >
             <Plus className="w-3 h-3" />

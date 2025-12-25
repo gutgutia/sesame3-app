@@ -100,19 +100,44 @@ export interface ProfileData {
   goals?: Array<{
     id: string;
     title: string;
+    description?: string | null;
     category?: string | null;
     status?: string | null;
-    tasks?: Array<{ id: string; title: string; completed: boolean }>;
+    priority?: string | null;
+    targetDate?: string | null;
+    tasks?: Array<{
+      id: string;
+      title: string;
+      status?: string | null;
+      completed: boolean;
+      dueDate?: string | null;
+      priority?: string | null;
+      subtasks?: Array<{
+        id: string;
+        title: string;
+        status?: string | null;
+        completed: boolean;
+        dueDate?: string | null;
+        priority?: string | null;
+      }>;
+    }>;
   }>;
   schoolList?: Array<{
     id: string;
     tier?: string | null;
+    isDream?: boolean;
     status?: string | null;
+    interestLevel?: string | null;
     school?: {
       id: string;
       name: string;
+      shortName?: string | null;
       city?: string | null;
       state?: string | null;
+      acceptanceRate?: number | null;
+      satRange25?: number | null;
+      satRange75?: number | null;
+      websiteUrl?: string | null;
     } | null;
   }>;
 }

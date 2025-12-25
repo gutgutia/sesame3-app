@@ -50,7 +50,13 @@ export async function GET() {
         goals: {
           include: {
             tasks: {
+              where: { parentTaskId: null }, // Only top-level tasks
               orderBy: { displayOrder: "asc" },
+              include: {
+                subtasks: {
+                  orderBy: { displayOrder: "asc" },
+                },
+              },
             },
           },
           orderBy: { displayOrder: "asc" },
