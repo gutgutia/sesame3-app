@@ -16,7 +16,8 @@ import {
   Lightbulb,
   BarChart3,
   Plus,
-  Clock,
+  GraduationCap,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -59,20 +60,21 @@ export default function ChancesPage() {
   const [assessedSchools, setAssessedSchools] = useState<AssessedSchool[]>([]);
   const [expandedSchoolId, setExpandedSchoolId] = useState<string | null>(null);
   
-  // Search state
-  const [showSearch, setShowSearch] = useState(false);
+  // Add card state
+  const [isAddingSchool, setIsAddingSchool] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<School[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
   
   // Calculation state
-  const [calculatingSchoolId, setCalculatingSchoolId] = useState<string | null>(null);
+  const [calculatingSchool, setCalculatingSchool] = useState<School | null>(null);
   const [calculationProgress, setCalculationProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   
   const searchInputRef = useRef<HTMLInputElement>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const addCardRef = useRef<HTMLDivElement>(null);
 
   // Load initial school if provided via URL
   const loadSchoolById = useCallback(async (schoolId: string) => {
@@ -93,6 +95,26 @@ export default function ChancesPage() {
     }
   }, [initialSchoolId, loadSchoolById]);
 
+  // Focus input when starting to add
+  useEffect(() => {
+    if (isAddingSchool) {
+      searchInputRef.current?.focus();
+    }
+  }, [isAddingSchool]);
+
+  // Close add card when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (addCardRef.current && !addCardRef.current.contains(event.target as Node)) {
+        if (isAddingSchool && !searchQuery) {
+          setIsAddingSchool(false);
+        }
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isAddingSchool, searchQuery]);
+
   // Debounced search
   const searchSchools = useCallback(async (query: string) => {
     if (query.length < 2) {
@@ -102,7 +124,7 @@ export default function ChancesPage() {
 
     setIsSearching(true);
     try {
-      const res = await fetch(`/api/schools/search?q=${encodeURIComponent(query)}&limit=8`);
+      const res = await fetch(`/api/schools/search?q=${encodeURIComponent(query)}&limit=6`);
       if (res.ok) {
         const data = await res.json();
         setSearchResults(data.schools || []);
@@ -135,16 +157,14 @@ export default function ChancesPage() {
     const existing = assessedSchools.find(s => s.schoolId === school.id);
     if (existing) {
       setExpandedSchoolId(school.id);
-      setShowSearch(false);
+      cancelAddSchool();
       return;
     }
     
-    setCalculatingSchoolId(school.id);
+    setCalculatingSchool(school);
     setError(null);
     setCalculationProgress("Analyzing your profile...");
-    setShowSearch(false);
-    setSearchQuery("");
-    setSearchResults([]);
+    cancelAddSchool();
     
     try {
       // Simulate progress steps
@@ -165,7 +185,7 @@ export default function ChancesPage() {
       
       const result = await res.json();
       
-      // Add to assessed schools
+      // Add to assessed schools at the top
       setAssessedSchools(prev => [
         { schoolId: school.id, school, result },
         ...prev,
@@ -175,7 +195,7 @@ export default function ChancesPage() {
       console.error("Calculation error:", error);
       setError(error instanceof Error ? error.message : "Failed to calculate chances");
     } finally {
-      setCalculatingSchoolId(null);
+      setCalculatingSchool(null);
       setCalculationProgress("");
     }
   };
@@ -184,6 +204,14 @@ export default function ChancesPage() {
   const handleSelectSchool = (school: School) => {
     setShowResults(false);
     calculateForSchool(school);
+  };
+
+  // Cancel adding school
+  const cancelAddSchool = () => {
+    setIsAddingSchool(false);
+    setSearchQuery("");
+    setSearchResults([]);
+    setShowResults(false);
   };
 
   // Toggle expand/collapse
@@ -199,119 +227,40 @@ export default function ChancesPage() {
     await calculateForSchool(school);
   };
 
+  // Format relative date
+  const formatCheckedDate = (date: Date | string) => {
+    const d = new Date(date);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  };
+
   return (
     <div className="min-h-screen bg-surface-primary pb-20">
       {/* Header */}
       <div className="border-b border-border-subtle bg-surface-secondary/50">
         <div className="max-w-4xl mx-auto px-6 py-8">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center">
-                  <Target className="w-5 h-5 text-white" />
-                </div>
-                <h1 className="text-2xl font-semibold text-text-primary">
-                  Your Chances
-                </h1>
-              </div>
-              <p className="text-text-secondary">
-                See how you stack up against your target schools
-              </p>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-primary to-accent-secondary flex items-center justify-center">
+              <Target className="w-5 h-5 text-white" />
             </div>
-            
-            {/* Add School Button */}
-            {!showSearch && (
-              <Button 
-                onClick={() => {
-                  setShowSearch(true);
-                  setTimeout(() => searchInputRef.current?.focus(), 100);
-                }}
-                variant="secondary"
-              >
-                <Plus className="w-4 h-4" />
-                Add School
-              </Button>
-            )}
+            <h1 className="text-2xl font-semibold text-text-primary">
+              Your Chances
+            </h1>
           </div>
+          <p className="text-text-secondary">
+            See how you stack up against your target schools
+          </p>
         </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-8">
-        {/* Search (shown when adding) */}
-        {showSearch && (
-          <div className="relative mb-8">
-            <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onFocus={() => setShowResults(true)}
-                onBlur={() => setTimeout(() => setShowResults(false), 200)}
-                placeholder="Search for a school to check your chances..."
-                className={cn(
-                  "w-full pl-12 pr-12 py-4 rounded-xl",
-                  "bg-surface-secondary border border-border-subtle",
-                  "text-text-primary placeholder:text-text-muted",
-                  "focus:outline-none focus:ring-2 focus:ring-accent-primary/30 focus:border-accent-primary",
-                  "transition-all"
-                )}
-              />
-              <button
-                onClick={() => {
-                  setShowSearch(false);
-                  setSearchQuery("");
-                  setSearchResults([]);
-                }}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-              {isSearching && (
-                <Loader2 className="absolute right-12 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted animate-spin" />
-              )}
-            </div>
-            
-            {/* Search Results Dropdown */}
-            {showResults && searchResults.length > 0 && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-surface-secondary border border-border-subtle rounded-xl shadow-lg overflow-hidden z-50">
-                {searchResults.map((school) => (
-                  <button
-                    key={school.id}
-                    onClick={() => handleSelectSchool(school)}
-                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-tertiary transition-colors text-left"
-                  >
-                    <SchoolLogo name={school.name} size="sm" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-text-primary truncate">
-                        {school.name}
-                      </div>
-                      <div className="text-sm text-text-muted">
-                        {school.city}, {school.state}
-                        {school.acceptanceRate && (
-                          <span className="ml-2">
-                            • {(school.acceptanceRate * 100).toFixed(1)}% acceptance
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Calculating State */}
-        {calculatingSchoolId && (
-          <div className="bg-surface-secondary border border-border-subtle rounded-2xl p-8 mb-6 text-center">
-            <Loader2 className="w-12 h-12 text-accent-primary mx-auto mb-4 animate-spin" />
-            <p className="text-text-primary font-medium mb-2">{calculationProgress}</p>
-            <p className="text-text-muted text-sm">This may take a few seconds...</p>
-          </div>
-        )}
-
         {/* Error Display */}
         {error && (
           <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
@@ -322,45 +271,152 @@ export default function ChancesPage() {
           </div>
         )}
 
-        {/* Assessed Schools */}
-        {assessedSchools.length > 0 && (
-          <div className="space-y-4">
-            {assessedSchools.map(({ schoolId, school, result }) => (
-              <SchoolChancesCard
-                key={schoolId}
-                school={school}
-                result={result}
-                isExpanded={expandedSchoolId === schoolId}
-                onToggle={() => toggleExpand(schoolId)}
-                onRecalculate={() => recalculate(school)}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Empty State */}
-        {assessedSchools.length === 0 && !calculatingSchoolId && !showSearch && (
-          <div className="text-center py-16">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-surface-secondary flex items-center justify-center">
-              <TrendingUp className="w-8 h-8 text-text-muted" />
+        {/* Schools List */}
+        <div className="space-y-4">
+          {/* Calculating Card - Shows when calculating */}
+          {calculatingSchool && (
+            <div className="bg-surface-secondary border border-border-subtle rounded-2xl p-5">
+              <div className="flex items-center gap-4">
+                <SchoolLogo name={calculatingSchool.name} size="md" />
+                <div className="flex-1">
+                  <h3 className="font-semibold text-text-primary">
+                    {calculatingSchool.name}
+                  </h3>
+                  <p className="text-sm text-text-muted">
+                    {calculatingSchool.city}, {calculatingSchool.state}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 text-accent-primary">
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span className="text-sm">{calculationProgress}</span>
+                </div>
+              </div>
             </div>
-            <h3 className="text-lg font-medium text-text-primary mb-2">
-              Check Your Chances
-            </h3>
-            <p className="text-text-secondary max-w-md mx-auto mb-6">
-              Add a school to see a personalized assessment of your admission chances based on your profile and goals.
-            </p>
-            <Button 
-              onClick={() => {
-                setShowSearch(true);
-                setTimeout(() => searchInputRef.current?.focus(), 100);
-              }}
-            >
-              <Plus className="w-4 h-4" />
-              Add Your First School
-            </Button>
+          )}
+
+          {/* Assessed Schools */}
+          {assessedSchools.map(({ schoolId, school, result }) => (
+            <SchoolChancesCard
+              key={schoolId}
+              school={school}
+              result={result}
+              isExpanded={expandedSchoolId === schoolId}
+              onToggle={() => toggleExpand(schoolId)}
+              onRecalculate={() => recalculate(school)}
+              formatCheckedDate={formatCheckedDate}
+            />
+          ))}
+
+          {/* Add School Card */}
+          <div 
+            ref={addCardRef}
+            className={cn(
+              "rounded-2xl border-2 border-dashed transition-all",
+              isAddingSchool 
+                ? "border-accent-primary bg-surface-secondary" 
+                : "border-border-subtle hover:border-accent-primary/50 hover:bg-surface-secondary/50"
+            )}
+          >
+            {isAddingSchool ? (
+              // Active search state
+              <div className="p-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    onFocus={() => setShowResults(true)}
+                    placeholder="Type a school name..."
+                    className={cn(
+                      "w-full pl-10 pr-10 py-3 rounded-xl",
+                      "bg-surface-tertiary border-none",
+                      "text-text-primary placeholder:text-text-muted",
+                      "focus:outline-none focus:ring-2 focus:ring-accent-primary/30",
+                      "transition-all"
+                    )}
+                  />
+                  <button
+                    onClick={cancelAddSchool}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                
+                {/* Search Results */}
+                {showResults && (searchResults.length > 0 || isSearching) && (
+                  <div className="mt-2 bg-surface-tertiary rounded-xl overflow-hidden">
+                    {isSearching && searchResults.length === 0 && (
+                      <div className="px-4 py-3 flex items-center gap-2 text-text-muted">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span className="text-sm">Searching...</span>
+                      </div>
+                    )}
+                    {searchResults.map((school) => (
+                      <button
+                        key={school.id}
+                        onClick={() => handleSelectSchool(school)}
+                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-surface-primary/50 transition-colors text-left"
+                      >
+                        <SchoolLogo name={school.name} size="sm" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-text-primary truncate">
+                            {school.name}
+                          </div>
+                          <div className="text-sm text-text-muted">
+                            {school.city}, {school.state}
+                            {school.acceptanceRate && (
+                              <span className="ml-2">
+                                • {(school.acceptanceRate * 100).toFixed(1)}% acceptance
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                    {searchQuery.length >= 2 && !isSearching && searchResults.length === 0 && (
+                      <div className="px-4 py-3 text-sm text-text-muted">
+                        No schools found matching "{searchQuery}"
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Inactive placeholder state
+              <button
+                onClick={() => setIsAddingSchool(true)}
+                className="w-full p-5 flex items-center gap-4 text-left group"
+              >
+                <div className="w-12 h-12 rounded-xl bg-surface-tertiary flex items-center justify-center group-hover:bg-accent-primary/10 transition-colors">
+                  <Plus className="w-5 h-5 text-text-muted group-hover:text-accent-primary transition-colors" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium text-text-muted group-hover:text-text-primary transition-colors">
+                    Add a school
+                  </h3>
+                  <p className="text-sm text-text-muted">
+                    Check your chances at any school
+                  </p>
+                </div>
+              </button>
+            )}
           </div>
-        )}
+
+          {/* Empty State Hint */}
+          {assessedSchools.length === 0 && !calculatingSchool && !isAddingSchool && (
+            <div className="text-center py-8">
+              <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-surface-secondary flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-text-muted" />
+              </div>
+              <p className="text-text-muted text-sm">
+                Click "Add a school" above to get started
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -376,6 +432,7 @@ interface SchoolChancesCardProps {
   isExpanded: boolean;
   onToggle: () => void;
   onRecalculate: () => void;
+  formatCheckedDate: (date: Date | string) => string;
 }
 
 function SchoolChancesCard({ 
@@ -384,6 +441,7 @@ function SchoolChancesCard({
   isExpanded, 
   onToggle,
   onRecalculate,
+  formatCheckedDate,
 }: SchoolChancesCardProps) {
   const tierColors: Record<string, string> = {
     safety: "bg-green-500/20 text-green-400",
@@ -414,21 +472,26 @@ function SchoolChancesCard({
           </p>
         </div>
         
-        {/* Probability Badge */}
-        <div className="text-right">
+        {/* Probability Badge + Date */}
+        <div className="text-right shrink-0">
           <div className="text-2xl font-bold text-accent-primary">
             {result.probability}%
           </div>
-          <div className={cn(
-            "inline-block px-2 py-0.5 rounded-full text-xs font-medium",
-            tierColors[result.tier] || "bg-gray-500/20 text-gray-400"
-          )}>
-            {result.tier.charAt(0).toUpperCase() + result.tier.slice(1)}
+          <div className="flex items-center gap-2 justify-end">
+            <div className={cn(
+              "inline-block px-2 py-0.5 rounded-full text-xs font-medium",
+              tierColors[result.tier] || "bg-gray-500/20 text-gray-400"
+            )}>
+              {result.tier.charAt(0).toUpperCase() + result.tier.slice(1)}
+            </div>
+            <span className="text-xs text-text-muted">
+              • {formatCheckedDate(result.calculatedAt)}
+            </span>
           </div>
         </div>
         
         {/* Expand/Collapse Icon */}
-        <div className="text-text-muted">
+        <div className="text-text-muted shrink-0">
           {isExpanded ? (
             <ChevronUp className="w-5 h-5" />
           ) : (
@@ -513,16 +576,7 @@ function SchoolChancesCard({
           )}
           
           {/* Footer */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-text-muted text-sm">
-              <Clock className="w-4 h-4" />
-              Checked {new Date(result.calculatedAt).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-                year: "numeric",
-              })}
-            </div>
-            
+          <div className="flex items-center justify-end">
             <Button 
               variant="secondary" 
               size="sm"
