@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { X, Send, MessageCircle, FileText, Loader2, Sparkles, ArrowLeft } from "lucide-react";
-import { useChat } from "@ai-sdk/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Input";
@@ -17,11 +16,19 @@ interface ShareStoryModalProps {
 type Mode = "conversation" | "note";
 type Step = "input" | "synthesizing" | "preview";
 
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+}
+
 interface SynthesizedStory {
   title: string;
   summary: string;
   themes: string[];
 }
+
+const OPENER_MESSAGE = "I'd love to learn more about you beyond grades and test scores.\n\nWhat's something you're passionate about, or an experience that shaped who you are? It could be anything - big or small.";
 
 export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryModalProps) {
   const [mode, setMode] = useState<Mode>("conversation");
@@ -30,35 +37,35 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
   const [synthesized, setSynthesized] = useState<SynthesizedStory | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [initialMessageLoaded, setInitialMessageLoaded] = useState(false);
+  
+  // Chat state (manual, like ChatInterface)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  // Chat hook for conversation mode
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat({
-    api: "/api/profile/stories/chat",
-    onFinish: () => {
-      scrollToBottom();
-    },
-  });
 
   // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  // Load initial message for conversation mode
+  // Auto-scroll when messages change
   useEffect(() => {
-    if (isOpen && mode === "conversation" && !initialMessageLoaded && messages.length === 0) {
-      // Add the opener message directly
-      setMessages([{ 
-        id: "initial", 
-        role: "assistant", 
-        content: "I'd love to learn more about you beyond grades and test scores.\n\nWhat's something you're passionate about, or an experience that shaped who you are? It could be anything - big or small.",
+    scrollToBottom();
+  }, [messages]);
+
+  // Initialize with opener message when modal opens
+  useEffect(() => {
+    if (isOpen && mode === "conversation" && messages.length === 0) {
+      setMessages([{
+        id: "opener",
+        role: "assistant",
+        content: OPENER_MESSAGE,
       }]);
-      setInitialMessageLoaded(true);
     }
-  }, [isOpen, mode, initialMessageLoaded, messages.length, setMessages]);
+  }, [isOpen, mode, messages.length]);
 
   // Reset state when modal closes
   useEffect(() => {
@@ -66,18 +73,114 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
       setMode("conversation");
       setStep("input");
       setNoteContent("");
+      setChatInput("");
       setSynthesized(null);
       setMessages([]);
-      setInitialMessageLoaded(false);
+      setIsLoading(false);
     }
-  }, [isOpen, setMessages]);
+  }, [isOpen]);
 
-  // Focus input when switching modes
+  // Focus input when switching to note mode
   useEffect(() => {
     if (isOpen && mode === "note" && inputRef.current) {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen, mode]);
+
+  // Send message (manual fetch, same pattern as ChatInterface)
+  const sendMessage = useCallback(async (content: string) => {
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content,
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+
+    try {
+      const response = await fetch("/api/profile/stories/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(m => ({
+            role: m.role,
+            content: m.content,
+          })),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to send message");
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error("No response body");
+      }
+
+      const decoder = new TextDecoder();
+      let fullText = "";
+
+      const assistantMessage: Message = {
+        id: `assistant-${Date.now()}`,
+        role: "assistant",
+        content: "",
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+
+      // Read the stream (plain text, same as ChatInterface)
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        fullText += chunk;
+
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantMessage.id
+              ? { ...m, content: fullText }
+              : m
+          )
+        );
+      }
+
+      // Fallback for empty response
+      if (!fullText.trim()) {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantMessage.id
+              ? { ...m, content: "I'd love to hear more about that. What else would you like to share?" }
+              : m
+          )
+        );
+      }
+
+    } catch (error) {
+      console.error("Chat error:", error);
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `error-${Date.now()}`,
+          role: "assistant",
+          content: "Sorry, I encountered an error. Please try again.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [messages]);
+
+  // Handle chat submit
+  const handleChatSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim() || isLoading) return;
+
+    sendMessage(chatInput.trim());
+    setChatInput("");
+  };
 
   // Build raw content from conversation or note
   const buildRawContent = (): string => {
@@ -153,7 +256,7 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
   };
 
   // Check if ready to synthesize
-  const canSynthesize = mode === "conversation" 
+  const canSynthesize = mode === "conversation"
     ? messages.filter((m) => m.role === "user").length >= 2
     : noteContent.trim().length > 50;
 
@@ -331,8 +434,10 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
                 ))}
                 {isLoading && (
                   <div className="flex justify-start">
-                    <div className="bg-bg-sidebar px-4 py-3 rounded-2xl rounded-bl-md">
-                      <Loader2 className="w-5 h-5 animate-spin text-text-muted" />
+                    <div className="bg-bg-sidebar px-4 py-3 rounded-2xl rounded-bl-md flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
+                      <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
+                      <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce" />
                     </div>
                   </div>
                 )}
@@ -340,16 +445,16 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
               </div>
 
               {/* Chat Input */}
-              <form onSubmit={handleSubmit} className="p-4 border-t border-border-subtle">
+              <form onSubmit={handleChatSubmit} className="p-4 border-t border-border-subtle">
                 <div className="flex items-end gap-3">
                   <div className="flex-1 relative">
                     <textarea
-                      value={input}
-                      onChange={handleInputChange}
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && !e.shiftKey) {
                           e.preventDefault();
-                          handleSubmit(e as unknown as React.FormEvent);
+                          handleChatSubmit(e);
                         }
                       }}
                       placeholder="Share your thoughts..."
@@ -359,7 +464,7 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
                   </div>
                   <Button
                     type="submit"
-                    disabled={!input?.trim() || isLoading}
+                    disabled={!chatInput.trim() || isLoading}
                     size="icon"
                     className="shrink-0"
                   >
@@ -424,4 +529,3 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
     </div>
   );
 }
-
