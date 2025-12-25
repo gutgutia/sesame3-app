@@ -1,22 +1,15 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { updateSession } from "@/lib/supabase/middleware";
 
-// Middleware for future authentication
-// Currently allows all access for development
-// When ready for auth, uncomment the Supabase integration below
+const protectedRoutes = ["/", "/plan", "/profile", "/schools", "/discover", "/advisor", "/chances", "/settings"];
+const authRoutes = ["/login", "/auth"];
 
 export async function middleware(request: NextRequest) {
-  // For now, allow all access - no authentication required
-  return NextResponse.next();
-  
-  // ============================================================
-  // FUTURE: Uncomment below when ready for real authentication
-  // ============================================================
-  /*
-  import { updateSession } from "@/lib/supabase/middleware";
-  
-  const protectedRoutes = ["/", "/plan", "/profile", "/schools", "/discover", "/advisor"];
-  const authRoutes = ["/login", "/auth"];
-  
+  // Development bypass - set BYPASS_AUTH=true in .env.local for easy local dev
+  if (process.env.BYPASS_AUTH === "true") {
+    return NextResponse.next();
+  }
+
   const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
@@ -28,6 +21,7 @@ export async function middleware(request: NextRequest) {
     (route) => pathname === route || pathname.startsWith(route + "/")
   );
 
+  // Redirect to login if accessing protected route without auth
   if (isProtectedRoute && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
@@ -35,6 +29,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Redirect to home if accessing auth routes while logged in
   if (isAuthRoute && user) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
@@ -42,7 +37,6 @@ export async function middleware(request: NextRequest) {
   }
 
   return supabaseResponse;
-  */
 }
 
 export const config = {
@@ -52,8 +46,9 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
+     * - public folder assets
+     * - api routes (they handle their own auth)
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
