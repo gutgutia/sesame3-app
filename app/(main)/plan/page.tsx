@@ -152,101 +152,191 @@ export default function PlanPage() {
         </div>
       </div>
 
-      {goals.length === 0 ? (
-        <Card className="p-8 text-center">
-          <div className="w-16 h-16 bg-accent-surface rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Target className="w-8 h-8 text-accent-primary" />
-          </div>
-          <h2 className="font-display font-bold text-xl mb-2">No goals yet</h2>
-          <p className="text-text-muted mb-6 max-w-md mx-auto">
-            Start by setting some goals — summer programs, competitions, or projects.
-          </p>
-          <div className="flex gap-3 justify-center">
-            <Button onClick={() => setIsAddGoalModalOpen(true)}>
-              <Plus className="w-4 h-4" />
-              Add Your First Goal
-            </Button>
-            <Link href="/advisor?mode=planning">
-              <Button variant="secondary">
-                <Sparkles className="w-4 h-4" />
-                Brainstorm Ideas
-              </Button>
-            </Link>
-          </div>
-        </Card>
-      ) : (
-        <div className="space-y-8">
-          {/* Active Goals */}
-          {activeGoals.length > 0 && (
-            <GoalSection 
-              title="In Progress" 
-              goals={activeGoals} 
-              onRefresh={refreshProfile}
-              onAddTask={openTaskModal}
-            />
-          )}
-
-          {/* Planning Goals */}
-          {planningGoals.length > 0 && (
-            <GoalSection 
-              title="Planning" 
-              goals={planningGoals} 
-              onRefresh={refreshProfile}
-              onAddTask={openTaskModal}
-            />
-          )}
-
-          {/* Parking Lot */}
-          {parkingLotGoals.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
-                <Archive className="w-5 h-5 text-text-muted" />
-                <h2 className="font-display font-bold text-lg text-text-muted">Parking Lot</h2>
-                <span className="text-xs text-text-light">({parkingLotGoals.length})</span>
+      {/* Main Layout: 2/3 content + 1/3 sidebar */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content - 2/3 width */}
+        <div className="lg:col-span-2">
+          {goals.length === 0 ? (
+            <Card className="p-8 text-center">
+              <div className="w-16 h-16 bg-accent-surface rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Target className="w-8 h-8 text-accent-primary" />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {parkingLotGoals.map(goal => (
-                  <GoalCard 
-                    key={goal.id} 
-                    goal={goal} 
-                    minimal 
-                    onRefresh={refreshProfile}
-                    onAddTask={openTaskModal}
-                  />
-                ))}
+              <h2 className="font-display font-bold text-xl mb-2">No goals yet</h2>
+              <p className="text-text-muted mb-6 max-w-md mx-auto">
+                Start by setting some goals — summer programs, competitions, or projects.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button onClick={() => setIsAddGoalModalOpen(true)}>
+                  <Plus className="w-4 h-4" />
+                  Add Your First Goal
+                </Button>
+                <Link href="/advisor?mode=planning">
+                  <Button variant="secondary">
+                    <Sparkles className="w-4 h-4" />
+                    Brainstorm Ideas
+                  </Button>
+                </Link>
               </div>
-            </div>
-          )}
+            </Card>
+          ) : (
+            <div className="space-y-8">
+              {/* Active Goals */}
+              {activeGoals.length > 0 && (
+                <GoalSection 
+                  title="In Progress" 
+                  goals={activeGoals} 
+                  onRefresh={refreshProfile}
+                  onAddTask={openTaskModal}
+                />
+              )}
 
-          {/* Completed */}
-          {completedGoals.length > 0 && (
-            <div>
-              <button 
-                onClick={() => setShowCompleted(!showCompleted)}
-                className="flex items-center gap-2 mb-4 text-text-muted hover:text-text-main transition-colors"
-              >
-                {showCompleted ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                <span className="font-display font-bold text-lg">Completed</span>
-                <span className="text-xs text-text-light">({completedGoals.length})</span>
-              </button>
-              
-              {showCompleted && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {completedGoals.map(goal => (
-                    <GoalCard 
-                      key={goal.id} 
-                      goal={goal} 
-                      completed 
-                      onRefresh={refreshProfile}
-                      onAddTask={openTaskModal}
-                    />
-                  ))}
+              {/* Planning Goals */}
+              {planningGoals.length > 0 && (
+                <GoalSection 
+                  title="Planning" 
+                  goals={planningGoals} 
+                  onRefresh={refreshProfile}
+                  onAddTask={openTaskModal}
+                />
+              )}
+
+              {/* Parking Lot */}
+              {parkingLotGoals.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-4">
+                    <Archive className="w-5 h-5 text-text-muted" />
+                    <h2 className="font-display font-bold text-lg text-text-muted">Parking Lot</h2>
+                    <span className="text-xs text-text-light">({parkingLotGoals.length})</span>
+                  </div>
+                  <div className="space-y-4">
+                    {parkingLotGoals.map(goal => (
+                      <GoalCard 
+                        key={goal.id} 
+                        goal={goal} 
+                        minimal 
+                        onRefresh={refreshProfile}
+                        onAddTask={openTaskModal}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Completed */}
+              {completedGoals.length > 0 && (
+                <div>
+                  <button 
+                    onClick={() => setShowCompleted(!showCompleted)}
+                    className="flex items-center gap-2 mb-4 text-text-muted hover:text-text-main transition-colors"
+                  >
+                    {showCompleted ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                    <span className="font-display font-bold text-lg">Completed</span>
+                    <span className="text-xs text-text-light">({completedGoals.length})</span>
+                  </button>
+                  
+                  {showCompleted && (
+                    <div className="space-y-4">
+                      {completedGoals.map(goal => (
+                        <GoalCard 
+                          key={goal.id} 
+                          goal={goal} 
+                          completed 
+                          onRefresh={refreshProfile}
+                          onAddTask={openTaskModal}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           )}
         </div>
-      )}
+
+        {/* Right Sidebar - 1/3 width */}
+        <div className="lg:col-span-1 space-y-5">
+          {/* Quick Stats */}
+          {goals.length > 0 && (
+            <div className="bg-white border border-border-subtle rounded-[20px] p-5 shadow-card">
+              <h3 className="font-display font-bold text-text-main mb-4">Overview</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Total Goals</span>
+                  <span className="font-bold text-text-main">{goals.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">In Progress</span>
+                  <span className="font-bold text-accent-primary">{activeGoals.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Planning</span>
+                  <span className="font-bold text-amber-600">{planningGoals.length}</span>
+                </div>
+                {completedGoals.length > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Completed</span>
+                    <span className="font-bold text-green-600">{completedGoals.length}</span>
+                  </div>
+                )}
+                <div className="h-px bg-border-subtle my-2" />
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Total Tasks</span>
+                  <span className="font-bold text-text-main">
+                    {goals.reduce((acc, g) => acc + g.tasks.length + g.tasks.reduce((a, t) => a + t.subtasks.length, 0), 0)}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Advisor CTA */}
+          <Link 
+            href="/advisor?mode=planning"
+            className="block bg-accent-surface/50 border border-accent-border rounded-[20px] p-5 hover:bg-accent-surface transition-colors group"
+          >
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                <Sparkles className="w-5 h-5 text-accent-primary" />
+              </div>
+              <div className="font-display font-bold text-text-main">Need ideas?</div>
+            </div>
+            <p className="text-sm text-text-muted mb-4">
+              Brainstorm goals and strategies with your AI advisor.
+            </p>
+            <div className="flex items-center gap-2 text-sm font-medium text-accent-primary group-hover:gap-3 transition-all">
+              <MessageCircle className="w-4 h-4" />
+              Chat with Advisor
+              <ChevronRight className="w-4 h-4" />
+            </div>
+          </Link>
+
+          {/* Upcoming Deadlines (placeholder for future) */}
+          {goals.some(g => g.tasks.some(t => t.dueDate)) && (
+            <div className="bg-white border border-border-subtle rounded-[20px] p-5 shadow-card">
+              <h3 className="font-display font-bold text-text-main mb-4 flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-text-muted" />
+                Upcoming
+              </h3>
+              <div className="space-y-3">
+                {goals
+                  .flatMap(g => g.tasks.filter(t => t.dueDate && !t.completed).map(t => ({ ...t, goalTitle: g.title })))
+                  .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
+                  .slice(0, 5)
+                  .map(task => (
+                    <div key={task.id} className="flex items-center gap-3 text-sm">
+                      <div className="w-2 h-2 rounded-full bg-accent-primary shrink-0" />
+                      <span className="flex-1 truncate text-text-main">{task.title}</span>
+                      <span className="text-xs text-text-muted shrink-0">
+                        {new Date(task.dueDate!).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+                      </span>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Modals */}
       <AddGoalModal
