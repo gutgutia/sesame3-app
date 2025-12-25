@@ -146,8 +146,13 @@ interface ProfileContextType {
   profile: ProfileData | null;
   isLoading: boolean;
   error: string | null;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (showLoading?: boolean) => Promise<void>;
   updateProfile: (updates: Partial<ProfileData>) => void;
+  // Optimistic update helpers
+  toggleTask: (goalId: string, taskId: string, completed: boolean) => void;
+  addTask: (goalId: string, task: NonNullable<ProfileData["goals"]>[number]["tasks"][number]) => void;
+  addSubtask: (goalId: string, parentTaskId: string, subtask: NonNullable<NonNullable<ProfileData["goals"]>[number]["tasks"][number]["subtasks"]>[number]) => void;
+  addGoal: (goal: NonNullable<ProfileData["goals"]>[number]) => void;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
@@ -200,14 +205,100 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     fetchProfile();
   }, [fetchProfile]);
 
-  // Refresh profile (call after updates)
-  const refreshProfile = useCallback(async () => {
-    await fetchProfile();
+  // Refresh profile (call after updates) - background refresh without loading state
+  const refreshProfile = useCallback(async (showLoading = false) => {
+    if (showLoading) {
+      await fetchProfile();
+    } else {
+      // Background refresh - don't show loading state
+      try {
+        const response = await fetch("/api/profile");
+        if (response.ok) {
+          const data = await response.json();
+          setProfile(data);
+        }
+      } catch (err) {
+        console.error("[ProfileContext] Background refresh error:", err);
+      }
+    }
   }, [fetchProfile]);
 
   // Optimistic update (update local state immediately)
   const updateProfile = useCallback((updates: Partial<ProfileData>) => {
     setProfile(prev => prev ? { ...prev, ...updates } : null);
+  }, []);
+
+  // Optimistic task toggle
+  const toggleTask = useCallback((goalId: string, taskId: string, completed: boolean) => {
+    setProfile(prev => {
+      if (!prev?.goals) return prev;
+      return {
+        ...prev,
+        goals: prev.goals.map(goal => {
+          if (goal.id !== goalId) return goal;
+          return {
+            ...goal,
+            tasks: goal.tasks?.map(task => {
+              if (task.id === taskId) {
+                return { ...task, completed, status: completed ? "completed" : "pending" };
+              }
+              // Check subtasks
+              return {
+                ...task,
+                subtasks: task.subtasks?.map(st => 
+                  st.id === taskId ? { ...st, completed, status: completed ? "completed" : "pending" } : st
+                ),
+              };
+            }),
+          };
+        }),
+      };
+    });
+  }, []);
+
+  // Optimistic add task
+  const addTask = useCallback((goalId: string, task: NonNullable<ProfileData["goals"]>[number]["tasks"][number]) => {
+    setProfile(prev => {
+      if (!prev?.goals) return prev;
+      return {
+        ...prev,
+        goals: prev.goals.map(goal => {
+          if (goal.id !== goalId) return goal;
+          return {
+            ...goal,
+            tasks: [...(goal.tasks || []), task],
+          };
+        }),
+      };
+    });
+  }, []);
+
+  // Optimistic add subtask
+  const addSubtask = useCallback((goalId: string, parentTaskId: string, subtask: NonNullable<NonNullable<ProfileData["goals"]>[number]["tasks"][number]["subtasks"]>[number]) => {
+    setProfile(prev => {
+      if (!prev?.goals) return prev;
+      return {
+        ...prev,
+        goals: prev.goals.map(goal => {
+          if (goal.id !== goalId) return goal;
+          return {
+            ...goal,
+            tasks: goal.tasks?.map(task => {
+              if (task.id !== parentTaskId) return task;
+              return {
+                ...task,
+                subtasks: [...(task.subtasks || []), subtask],
+              };
+            }),
+          };
+        }),
+      };
+    });
+  }, []);
+
+  // Optimistic add goal
+  const addGoal = useCallback((goal: NonNullable<ProfileData["goals"]>[number]) => {
+    setProfile(prev => prev ? { ...prev, goals: [...(prev.goals || []), goal] } : null);
   }, []);
 
   return (
@@ -218,6 +309,10 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         error,
         refreshProfile,
         updateProfile,
+        toggleTask,
+        addTask,
+        addSubtask,
+        addGoal,
       }}
     >
       {children}

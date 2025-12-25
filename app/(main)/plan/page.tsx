@@ -72,8 +72,8 @@ export default function PlanPage() {
     parentTaskTitle?: string;
   }>({ isOpen: false, goalId: "", goalTitle: "" });
   
-  // Use global profile context
-  const { profile, isLoading, refreshProfile } = useProfile();
+  // Use global profile context with optimistic updates
+  const { profile, isLoading, refreshProfile, toggleTask: optimisticToggleTask, addGoal: optimisticAddGoal, addTask: optimisticAddTask, addSubtask: optimisticAddSubtask } = useProfile();
   
   // Extract goals from profile
   const goals: Goal[] = (profile?.goals || []).map(g => ({
@@ -185,7 +185,7 @@ export default function PlanPage() {
                 <GoalSection 
                   title="In Progress" 
                   goals={activeGoals} 
-                  onRefresh={refreshProfile}
+                  onToggleTask={optimisticToggleTask}
                   onAddTask={openTaskModal}
                 />
               )}
@@ -195,7 +195,7 @@ export default function PlanPage() {
                 <GoalSection 
                   title="Planning" 
                   goals={planningGoals} 
-                  onRefresh={refreshProfile}
+                  onToggleTask={optimisticToggleTask}
                   onAddTask={openTaskModal}
                 />
               )}
@@ -214,7 +214,7 @@ export default function PlanPage() {
                         key={goal.id} 
                         goal={goal} 
                         minimal 
-                        onRefresh={refreshProfile}
+                        onToggleTask={optimisticToggleTask}
                         onAddTask={openTaskModal}
                       />
                     ))}
@@ -241,7 +241,7 @@ export default function PlanPage() {
                           key={goal.id} 
                           goal={goal} 
                           completed 
-                          onRefresh={refreshProfile}
+                          onToggleTask={optimisticToggleTask}
                           onAddTask={openTaskModal}
                         />
                       ))}
@@ -342,18 +342,58 @@ export default function PlanPage() {
       <AddGoalModal
         isOpen={isAddGoalModalOpen}
         onClose={() => setIsAddGoalModalOpen(false)}
-        onGoalAdded={() => {
+        onGoalAdded={(newGoal) => {
           setIsAddGoalModalOpen(false);
-          refreshProfile();
+          // Optimistic add if we have goal data, otherwise background refresh
+          if (newGoal) {
+            optimisticAddGoal({
+              id: newGoal.id,
+              title: newGoal.title,
+              description: newGoal.description,
+              category: newGoal.category,
+              status: newGoal.status,
+              priority: newGoal.priority,
+              targetDate: newGoal.targetDate,
+              tasks: [],
+            });
+          } else {
+            refreshProfile(); // Background refresh (no loading state)
+          }
         }}
       />
       
       <AddTaskModal
         isOpen={taskModalState.isOpen}
         onClose={closeTaskModal}
-        onTaskAdded={() => {
+        onTaskAdded={(newTask) => {
           closeTaskModal();
-          refreshProfile();
+          // Optimistic add if we have task data, otherwise background refresh
+          if (newTask && taskModalState.goalId) {
+            if (taskModalState.parentTaskId) {
+              optimisticAddSubtask(taskModalState.goalId, taskModalState.parentTaskId, {
+                id: newTask.id,
+                title: newTask.title,
+                status: newTask.status || "pending",
+                completed: newTask.completed || false,
+                dueDate: newTask.dueDate || null,
+                priority: newTask.priority || null,
+              });
+            } else {
+              optimisticAddTask(taskModalState.goalId, {
+                id: newTask.id,
+                title: newTask.title,
+                description: newTask.description,
+                status: newTask.status || "pending",
+                completed: newTask.completed || false,
+                dueDate: newTask.dueDate || null,
+                priority: newTask.priority || null,
+                startDate: newTask.startDate || null,
+                subtasks: [],
+              });
+            }
+          } else {
+            refreshProfile(); // Background refresh (no loading state)
+          }
         }}
         goalId={taskModalState.goalId}
         goalTitle={taskModalState.goalTitle}
@@ -371,12 +411,12 @@ export default function PlanPage() {
 function GoalSection({ 
   title, 
   goals, 
-  onRefresh,
+  onToggleTask,
   onAddTask,
 }: { 
   title: string; 
   goals: Goal[]; 
-  onRefresh: () => void;
+  onToggleTask: (goalId: string, taskId: string, completed: boolean) => void;
   onAddTask: (goalId: string, goalTitle: string, parentTaskId?: string, parentTaskTitle?: string) => void;
 }) {
   return (
@@ -387,7 +427,7 @@ function GoalSection({
           <GoalCard 
             key={goal.id} 
             goal={goal} 
-            onRefresh={onRefresh}
+            onToggleTask={onToggleTask}
             onAddTask={onAddTask}
           />
         ))}
@@ -400,13 +440,13 @@ function GoalCard({
   goal, 
   minimal = false, 
   completed = false,
-  onRefresh,
+  onToggleTask,
   onAddTask,
 }: { 
   goal: Goal; 
   minimal?: boolean; 
   completed?: boolean;
-  onRefresh: () => void;
+  onToggleTask: (goalId: string, taskId: string, completed: boolean) => void;
   onAddTask: (goalId: string, goalTitle: string, parentTaskId?: string, parentTaskTitle?: string) => void;
 }) {
   const [expanded, setExpanded] = useState(!minimal && !completed);
@@ -430,12 +470,20 @@ function GoalCard({
   const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
   const toggleTask = async (taskId: string, currentCompleted: boolean) => {
-    await fetch(`/api/profile/goals/${goal.id}/tasks/${taskId}`, {
+    // Optimistic update - update UI immediately
+    const newCompleted = !currentCompleted;
+    onToggleTask(goal.id, taskId, newCompleted);
+    
+    // Then sync with server in background (no await to avoid blocking UI)
+    fetch(`/api/profile/goals/${goal.id}/tasks/${taskId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed: !currentCompleted }),
+      body: JSON.stringify({ completed: newCompleted }),
+    }).catch(err => {
+      console.error("Failed to toggle task:", err);
+      // Rollback on failure
+      onToggleTask(goal.id, taskId, currentCompleted);
     });
-    onRefresh();
   };
 
   const getCategoryIcon = (category: string) => {

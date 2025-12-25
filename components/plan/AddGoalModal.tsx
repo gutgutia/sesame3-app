@@ -5,10 +5,20 @@ import { X, Loader2, Target, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
+interface NewGoal {
+  id: string;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  targetDate?: string | null;
+}
+
 interface AddGoalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onGoalAdded: () => void;
+  onGoalAdded: (goal?: NewGoal) => void;
 }
 
 type Category = "research" | "competition" | "leadership" | "project" | "academic" | "application" | "other";
@@ -74,13 +84,24 @@ export function AddGoalModal({ isOpen, onClose, onGoalAdded }: AddGoalModalProps
       });
 
       if (res.ok) {
-        onGoalAdded();
+        const newGoal = await res.json();
+        onGoalAdded({
+          id: newGoal.id,
+          title: newGoal.title,
+          description: newGoal.description,
+          category: newGoal.category,
+          status: newGoal.status,
+          priority: newGoal.priority,
+          targetDate: newGoal.targetDate,
+        });
         onClose();
       } else {
         console.error("Failed to add goal");
+        onGoalAdded(); // Fallback to refresh
       }
     } catch (error) {
       console.error("Error adding goal:", error);
+      onGoalAdded(); // Fallback to refresh
     } finally {
       setIsSaving(false);
     }

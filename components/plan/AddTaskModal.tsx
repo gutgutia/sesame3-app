@@ -5,10 +5,21 @@ import { X, Loader2, CheckSquare, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
+interface NewTask {
+  id: string;
+  title: string;
+  description?: string | null;
+  status?: string | null;
+  completed?: boolean;
+  dueDate?: string | null;
+  priority?: string | null;
+  startDate?: string | null;
+}
+
 interface AddTaskModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onTaskAdded: () => void;
+  onTaskAdded: (task?: NewTask) => void;
   goalId: string;
   goalTitle: string;
   parentTaskId?: string;  // If adding a subtask
@@ -74,13 +85,25 @@ export function AddTaskModal({
       });
 
       if (res.ok) {
-        onTaskAdded();
+        const newTask = await res.json();
+        onTaskAdded({
+          id: newTask.id,
+          title: newTask.title,
+          description: newTask.description,
+          status: newTask.status,
+          completed: newTask.completed || false,
+          dueDate: newTask.dueDate,
+          priority: newTask.priority,
+          startDate: newTask.startDate,
+        });
         onClose();
       } else {
         console.error("Failed to add task");
+        onTaskAdded(); // Fallback to refresh
       }
     } catch (error) {
       console.error("Error adding task:", error);
+      onTaskAdded(); // Fallback to refresh
     } finally {
       setIsSaving(false);
     }
