@@ -8,7 +8,6 @@ import {
   TrendingUp,
   ChevronDown,
   ChevronUp,
-  Sparkles,
   Target,
   AlertCircle,
   CheckCircle2,
@@ -16,7 +15,6 @@ import {
   Lightbulb,
   BarChart3,
   Plus,
-  RefreshCw,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -532,19 +530,30 @@ function SchoolCard({
           )}
         </div>
         
-        {/* Recalculate row - only if has result */}
+        {/* Actions row - only if has result */}
         {hasResult && !isExpanded && (
-          <div className="mt-3 pt-3 border-t border-border-subtle flex items-center justify-end">
+          <div className="mt-3 pt-3 border-t border-border-subtle flex items-center justify-between">
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                onCalculate();
+                onRemove();
               }}
-              className="flex items-center gap-1.5 text-xs text-text-muted hover:text-accent-primary transition-colors"
+              className="text-xs text-text-muted hover:text-red-400 underline transition-colors"
             >
-              <span>Checked {formatCheckedDate(result.calculatedAt)}</span>
-              <RefreshCw className="w-3 h-3" />
+              Remove
             </button>
+            <div className="flex items-center gap-3 text-xs text-text-muted">
+              <span>Checked {formatCheckedDate(result.calculatedAt)}</span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCalculate();
+                }}
+                className="text-text-muted hover:text-accent-primary underline transition-colors"
+              >
+                Recalculate
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -631,21 +640,23 @@ function SchoolCard({
                 e.stopPropagation();
                 onRemove();
               }}
-              className="text-sm text-text-muted hover:text-red-400 transition-colors"
+              className="text-sm text-text-muted hover:text-red-400 underline transition-colors"
             >
               Remove
             </button>
             
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCalculate();
-              }}
-              className="flex items-center gap-1.5 text-sm text-text-muted hover:text-accent-primary transition-colors"
-            >
+            <div className="flex items-center gap-3 text-sm text-text-muted">
               <span>Checked {formatCheckedDate(result.calculatedAt)}</span>
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCalculate();
+                }}
+                className="text-text-muted hover:text-accent-primary underline transition-colors"
+              >
+                Recalculate
+              </button>
+            </div>
           </div>
         </div>
       )}
