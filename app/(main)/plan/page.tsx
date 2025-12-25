@@ -1,31 +1,60 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, MessageCircle, Archive, Sparkles, ChevronDown, ChevronUp, Check, Target, Calendar } from "lucide-react";
+import { 
+  Plus, 
+  MessageCircle, 
+  Archive, 
+  Sparkles, 
+  ChevronDown, 
+  ChevronUp, 
+  ChevronRight,
+  Check, 
+  Target, 
+  Calendar,
+  MoreHorizontal,
+  Trash2,
+  Edit3,
+} from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/lib/context/ProfileContext";
+import { AddGoalModal, AddTaskModal } from "@/components/plan";
 
 // =============================================================================
 // TYPES
 // =============================================================================
 
+interface Subtask {
+  id: string;
+  title: string;
+  status: string;
+  completed: boolean;
+  dueDate: string | null;
+  priority: string | null;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  status: string;
+  completed: boolean;
+  dueDate: string | null;
+  priority: string | null;
+  subtasks: Subtask[];
+}
+
 interface Goal {
   id: string;
   title: string;
+  description: string | null;
   category: string;
   status: string;
   priority: string | null;
   targetDate: string | null;
-  description: string | null;
-  tasks: Array<{
-    id: string;
-    title: string;
-    completed: boolean;
-    dueDate: string | null;
-  }>;
+  tasks: Task[];
 }
 
 // =============================================================================
@@ -34,6 +63,14 @@ interface Goal {
 
 export default function PlanPage() {
   const [showCompleted, setShowCompleted] = useState(false);
+  const [isAddGoalModalOpen, setIsAddGoalModalOpen] = useState(false);
+  const [taskModalState, setTaskModalState] = useState<{
+    isOpen: boolean;
+    goalId: string;
+    goalTitle: string;
+    parentTaskId?: string;
+    parentTaskTitle?: string;
+  }>({ isOpen: false, goalId: "", goalTitle: "" });
   
   // Use global profile context
   const { profile, isLoading, refreshProfile } = useProfile();
@@ -42,28 +79,48 @@ export default function PlanPage() {
   const goals: Goal[] = (profile?.goals || []).map(g => ({
     id: g.id,
     title: g.title,
-    category: g.category || "general",
+    description: g.description || null,
+    category: g.category || "other",
     status: g.status || "planning",
-    priority: null,
-    targetDate: null,
-    description: null,
+    priority: g.priority || null,
+    targetDate: g.targetDate || null,
     tasks: (g.tasks || []).map(t => ({
       id: t.id,
       title: t.title,
-      completed: t.completed,
-      dueDate: null,
+      status: t.status || "pending",
+      completed: t.completed || false,
+      dueDate: t.dueDate || null,
+      priority: t.priority || null,
+      subtasks: (t.subtasks || []).map(st => ({
+        id: st.id,
+        title: st.title,
+        status: st.status || "pending",
+        completed: st.completed || false,
+        dueDate: st.dueDate || null,
+        priority: st.priority || null,
+      })),
     })),
   }));
-  
-  const refreshGoals = () => {
-    refreshProfile();
-  };
 
   // Group goals by status
   const activeGoals = goals.filter(g => g.status === "in_progress");
   const planningGoals = goals.filter(g => g.status === "planning");
   const parkingLotGoals = goals.filter(g => g.status === "parking_lot");
   const completedGoals = goals.filter(g => g.status === "completed");
+
+  const openTaskModal = (goalId: string, goalTitle: string, parentTaskId?: string, parentTaskTitle?: string) => {
+    setTaskModalState({
+      isOpen: true,
+      goalId,
+      goalTitle,
+      parentTaskId,
+      parentTaskTitle,
+    });
+  };
+
+  const closeTaskModal = () => {
+    setTaskModalState({ isOpen: false, goalId: "", goalTitle: "" });
+  };
 
   if (isLoading) {
     return (
@@ -81,22 +138,19 @@ export default function PlanPage() {
           <h1 className="font-display font-bold text-3xl text-text-main mb-2">Your Plan</h1>
           <p className="text-text-muted">Goals, tasks, and your path forward.</p>
         </div>
-        <Link href="/advisor?mode=planning">
-          <Button>
-            <Sparkles className="w-4 h-4" />
-            Brainstorm Goals
+        <div className="flex gap-3">
+          <Link href="/advisor?mode=planning">
+            <Button variant="secondary">
+              <MessageCircle className="w-4 h-4" />
+              Brainstorm
+            </Button>
+          </Link>
+          <Button onClick={() => setIsAddGoalModalOpen(true)}>
+            <Plus className="w-4 h-4" />
+            Add Goal
           </Button>
-        </Link>
+        </div>
       </div>
-
-      {/* Subtle Chat Prompt */}
-      <Link 
-        href="/advisor?mode=planning" 
-        className="flex items-center gap-2 text-sm text-text-muted hover:text-accent-primary transition-colors mb-6 group"
-      >
-        <MessageCircle className="w-4 h-4" />
-        <span>Need help setting goals? <span className="text-accent-primary group-hover:underline">Chat with your advisor →</span></span>
-      </Link>
 
       {goals.length === 0 ? (
         <Card className="p-8 text-center">
@@ -104,24 +158,42 @@ export default function PlanPage() {
             <Target className="w-8 h-8 text-accent-primary" />
           </div>
           <h2 className="font-display font-bold text-xl mb-2">No goals yet</h2>
-          <p className="text-text-muted mb-4">Start by setting some goals — summer programs, competitions, or projects.</p>
-          <Link href="/advisor?mode=planning">
-            <Button>
+          <p className="text-text-muted mb-6 max-w-md mx-auto">
+            Start by setting some goals — summer programs, competitions, or projects.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button onClick={() => setIsAddGoalModalOpen(true)}>
               <Plus className="w-4 h-4" />
               Add Your First Goal
             </Button>
-          </Link>
+            <Link href="/advisor?mode=planning">
+              <Button variant="secondary">
+                <Sparkles className="w-4 h-4" />
+                Brainstorm Ideas
+              </Button>
+            </Link>
+          </div>
         </Card>
       ) : (
         <div className="space-y-8">
           {/* Active Goals */}
           {activeGoals.length > 0 && (
-            <GoalSection title="In Progress" goals={activeGoals} onRefresh={refreshGoals} />
+            <GoalSection 
+              title="In Progress" 
+              goals={activeGoals} 
+              onRefresh={refreshProfile}
+              onAddTask={openTaskModal}
+            />
           )}
 
           {/* Planning Goals */}
           {planningGoals.length > 0 && (
-            <GoalSection title="Planning" goals={planningGoals} onRefresh={refreshGoals} />
+            <GoalSection 
+              title="Planning" 
+              goals={planningGoals} 
+              onRefresh={refreshProfile}
+              onAddTask={openTaskModal}
+            />
           )}
 
           {/* Parking Lot */}
@@ -134,7 +206,13 @@ export default function PlanPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {parkingLotGoals.map(goal => (
-                  <GoalCard key={goal.id} goal={goal} minimal onRefresh={refreshGoals} />
+                  <GoalCard 
+                    key={goal.id} 
+                    goal={goal} 
+                    minimal 
+                    onRefresh={refreshProfile}
+                    onAddTask={openTaskModal}
+                  />
                 ))}
               </div>
             </div>
@@ -155,7 +233,13 @@ export default function PlanPage() {
               {showCompleted && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {completedGoals.map(goal => (
-                    <GoalCard key={goal.id} goal={goal} completed onRefresh={refreshGoals} />
+                    <GoalCard 
+                      key={goal.id} 
+                      goal={goal} 
+                      completed 
+                      onRefresh={refreshProfile}
+                      onAddTask={openTaskModal}
+                    />
                   ))}
                 </div>
               )}
@@ -163,6 +247,29 @@ export default function PlanPage() {
           )}
         </div>
       )}
+
+      {/* Modals */}
+      <AddGoalModal
+        isOpen={isAddGoalModalOpen}
+        onClose={() => setIsAddGoalModalOpen(false)}
+        onGoalAdded={() => {
+          setIsAddGoalModalOpen(false);
+          refreshProfile();
+        }}
+      />
+      
+      <AddTaskModal
+        isOpen={taskModalState.isOpen}
+        onClose={closeTaskModal}
+        onTaskAdded={() => {
+          closeTaskModal();
+          refreshProfile();
+        }}
+        goalId={taskModalState.goalId}
+        goalTitle={taskModalState.goalTitle}
+        parentTaskId={taskModalState.parentTaskId}
+        parentTaskTitle={taskModalState.parentTaskTitle}
+      />
     </>
   );
 }
@@ -171,13 +278,28 @@ export default function PlanPage() {
 // COMPONENTS
 // =============================================================================
 
-function GoalSection({ title, goals, onRefresh }: { title: string; goals: Goal[]; onRefresh: () => void }) {
+function GoalSection({ 
+  title, 
+  goals, 
+  onRefresh,
+  onAddTask,
+}: { 
+  title: string; 
+  goals: Goal[]; 
+  onRefresh: () => void;
+  onAddTask: (goalId: string, goalTitle: string, parentTaskId?: string, parentTaskTitle?: string) => void;
+}) {
   return (
     <div>
       <h2 className="font-display font-bold text-lg text-text-main mb-4">{title}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {goals.map(goal => (
-          <GoalCard key={goal.id} goal={goal} onRefresh={onRefresh} />
+          <GoalCard 
+            key={goal.id} 
+            goal={goal} 
+            onRefresh={onRefresh}
+            onAddTask={onAddTask}
+          />
         ))}
       </div>
     </div>
@@ -188,24 +310,40 @@ function GoalCard({
   goal, 
   minimal = false, 
   completed = false,
-  onRefresh 
+  onRefresh,
+  onAddTask,
 }: { 
   goal: Goal; 
   minimal?: boolean; 
   completed?: boolean;
   onRefresh: () => void;
+  onAddTask: (goalId: string, goalTitle: string, parentTaskId?: string, parentTaskTitle?: string) => void;
 }) {
   const [expanded, setExpanded] = useState(!minimal && !completed);
 
-  const completedTasks = goal.tasks.filter(t => t.completed).length;
-  const totalTasks = goal.tasks.length;
+  // Count all tasks including subtasks
+  const countTasks = (tasks: Task[]): { completed: number; total: number } => {
+    let comp = 0;
+    let tot = 0;
+    for (const task of tasks) {
+      tot++;
+      if (task.completed) comp++;
+      for (const subtask of task.subtasks) {
+        tot++;
+        if (subtask.completed) comp++;
+      }
+    }
+    return { completed: comp, total: tot };
+  };
+
+  const { completed: completedTasks, total: totalTasks } = countTasks(goal.tasks);
   const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
-  const toggleTask = async (taskId: string, completed: boolean) => {
+  const toggleTask = async (taskId: string, currentCompleted: boolean) => {
     await fetch(`/api/profile/goals/${goal.id}/tasks/${taskId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ completed }),
+      body: JSON.stringify({ completed: !currentCompleted }),
     });
     onRefresh();
   };
@@ -216,8 +354,18 @@ function GoalCard({
       case "competition": return "🏆";
       case "leadership": return "👥";
       case "project": return "🚀";
+      case "academic": return "📚";
       case "application": return "📝";
       default: return "🎯";
+    }
+  };
+
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    try {
+      return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    } catch {
+      return null;
     }
   };
 
@@ -240,19 +388,19 @@ function GoalCard({
             {goal.targetDate && (
               <div className="flex items-center gap-1 text-xs text-text-muted mt-1">
                 <Calendar className="w-3 h-3" />
-                {goal.targetDate}
+                {formatDate(goal.targetDate)}
               </div>
             )}
           </div>
         </div>
-        {goal.tasks.length > 0 && (
+        <div className="flex items-center gap-1">
           <button 
             onClick={() => setExpanded(!expanded)}
             className="p-1 text-text-muted hover:text-text-main"
           >
             {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
-        )}
+        </div>
       </div>
 
       {/* Progress bar */}
@@ -272,37 +420,140 @@ function GoalCard({
       )}
 
       {/* Tasks */}
-      {expanded && goal.tasks.length > 0 && (
-        <div className="space-y-2 pt-3 border-t border-border-subtle">
-          {goal.tasks.map(task => (
-            <label 
-              key={task.id}
-              className="flex items-center gap-3 py-1.5 cursor-pointer group"
-            >
-              <button
-                onClick={() => toggleTask(task.id, !task.completed)}
-                className={cn(
-                  "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors",
-                  task.completed 
-                    ? "bg-accent-primary border-accent-primary text-white" 
-                    : "border-border-medium hover:border-accent-primary"
-                )}
-              >
-                {task.completed && <Check className="w-3 h-3" />}
-              </button>
-              <span className={cn(
-                "text-sm flex-1",
-                task.completed && "line-through text-text-muted"
-              )}>
-                {task.title}
-              </span>
-              {task.dueDate && (
-                <span className="text-xs text-text-light">{task.dueDate}</span>
-              )}
-            </label>
-          ))}
+      {expanded && (
+        <div className="pt-3 border-t border-border-subtle">
+          {goal.tasks.length > 0 ? (
+            <div className="space-y-1">
+              {goal.tasks.map(task => (
+                <TaskItem 
+                  key={task.id} 
+                  task={task} 
+                  goalId={goal.id}
+                  onToggle={toggleTask}
+                  onAddSubtask={(taskId, taskTitle) => onAddTask(goal.id, goal.title, taskId, taskTitle)}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted text-center py-2">No tasks yet</p>
+          )}
+          
+          {/* Add Task Button */}
+          <button
+            onClick={() => onAddTask(goal.id, goal.title)}
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2 text-sm text-text-muted hover:text-accent-primary hover:bg-accent-surface/50 rounded-lg transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Task
+          </button>
         </div>
       )}
     </Card>
+  );
+}
+
+function TaskItem({ 
+  task, 
+  goalId,
+  onToggle,
+  onAddSubtask,
+  isSubtask = false,
+}: { 
+  task: Task | Subtask; 
+  goalId: string;
+  onToggle: (taskId: string, completed: boolean) => void;
+  onAddSubtask: (taskId: string, taskTitle: string) => void;
+  isSubtask?: boolean;
+}) {
+  const [showSubtasks, setShowSubtasks] = useState(true);
+  const hasSubtasks = "subtasks" in task && task.subtasks.length > 0;
+
+  const getPriorityColor = (priority: string | null) => {
+    switch (priority) {
+      case "high": return "bg-red-500";
+      case "medium": return "bg-amber-500";
+      case "low": return "bg-green-500";
+      default: return null;
+    }
+  };
+
+  return (
+    <div className={cn("group", isSubtask && "ml-6")}>
+      <div className="flex items-center gap-2 py-1.5">
+        {/* Expand/Collapse for tasks with subtasks */}
+        {hasSubtasks && (
+          <button
+            onClick={() => setShowSubtasks(!showSubtasks)}
+            className="p-0.5 text-text-muted hover:text-text-main"
+          >
+            <ChevronRight className={cn(
+              "w-3 h-3 transition-transform",
+              showSubtasks && "rotate-90"
+            )} />
+          </button>
+        )}
+        {!hasSubtasks && !isSubtask && <div className="w-4" />}
+        
+        {/* Checkbox */}
+        <button
+          onClick={() => onToggle(task.id, task.completed)}
+          className={cn(
+            "w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0",
+            task.completed 
+              ? "bg-accent-primary border-accent-primary text-white" 
+              : "border-border-medium hover:border-accent-primary"
+          )}
+        >
+          {task.completed && <Check className="w-3 h-3" />}
+        </button>
+        
+        {/* Priority indicator */}
+        {task.priority && (
+          <div className={cn("w-1.5 h-1.5 rounded-full shrink-0", getPriorityColor(task.priority))} />
+        )}
+        
+        {/* Title */}
+        <span className={cn(
+          "text-sm flex-1",
+          task.completed && "line-through text-text-muted"
+        )}>
+          {task.title}
+        </span>
+        
+        {/* Due date */}
+        {task.dueDate && (
+          <span className="text-xs text-text-light">
+            {new Date(task.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+          </span>
+        )}
+        
+        {/* Add subtask button (only for top-level tasks) */}
+        {!isSubtask && (
+          <button
+            onClick={() => onAddSubtask(task.id, task.title)}
+            className="p-1 text-text-light opacity-0 group-hover:opacity-100 hover:text-accent-primary transition-all"
+            title="Add subtask"
+          >
+            <Plus className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+      
+      {/* Subtasks */}
+      {hasSubtasks && showSubtasks && (
+        <div className="space-y-0.5">
+          {(task as Task).subtasks.map(subtask => (
+            <TaskItem
+              key={subtask.id}
+              task={subtask}
+              goalId={goalId}
+              onToggle={onToggle}
+              onAddSubtask={onAddSubtask}
+              isSubtask
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

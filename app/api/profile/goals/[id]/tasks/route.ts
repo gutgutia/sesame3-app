@@ -25,9 +25,22 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Goal not found" }, { status: 404 });
     }
     
+    // If creating a subtask, verify the parent task exists and belongs to this goal
+    if (body.parentTaskId) {
+      const parentTask = await prisma.task.findFirst({
+        where: { id: body.parentTaskId, goalId },
+      });
+      if (!parentTask) {
+        return NextResponse.json({ error: "Parent task not found" }, { status: 404 });
+      }
+    }
+    
     // Get the next display order
     const lastTask = await prisma.task.findFirst({
-      where: { goalId },
+      where: { 
+        goalId,
+        parentTaskId: body.parentTaskId || null, // Same level tasks
+      },
       orderBy: { displayOrder: "desc" },
       select: { displayOrder: true },
     });
@@ -36,12 +49,18 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const task = await prisma.task.create({
       data: {
         goalId,
+        parentTaskId: body.parentTaskId || null,
         title: body.title,
         description: body.description,
+        status: body.status || "pending",
         completed: body.completed ?? false,
         dueDate: body.dueDate ? new Date(body.dueDate) : undefined,
+        startDate: body.startDate ? new Date(body.startDate) : undefined,
         priority: body.priority,
         displayOrder: body.displayOrder ?? nextOrder,
+      },
+      include: {
+        subtasks: true,
       },
     });
     

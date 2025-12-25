@@ -14,7 +14,13 @@ export async function GET() {
       where: { studentProfileId: profileId },
       include: {
         tasks: {
+          where: { parentTaskId: null }, // Only top-level tasks
           orderBy: { displayOrder: "asc" },
+          include: {
+            subtasks: {
+              orderBy: { displayOrder: "asc" },
+            },
+          },
         },
       },
       orderBy: { displayOrder: "asc" },

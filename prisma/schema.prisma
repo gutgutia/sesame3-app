@@ -621,16 +621,23 @@ model Task {
   goalId String
   goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
   
+  // Subtask Support (self-referencing)
+  parentTaskId String?
+  parentTask   Task?   @relation("TaskSubtasks", fields: [parentTaskId], references: [id], onDelete: Cascade)
+  subtasks     Task[]  @relation("TaskSubtasks")
+  
   // Task Info
   title       String
   description String?
   
   // Status
-  completed   Boolean   @default(false)
+  status      String    @default("pending")  // "pending" | "in_progress" | "completed" | "blocked"
+  completed   Boolean   @default(false)      // Quick toggle (derived from status === "completed")
   completedAt DateTime?
   
   // Timing
   dueDate     DateTime?
+  startDate   DateTime?
   
   // Priority
   priority    String?   // "high" | "medium" | "low"
@@ -642,6 +649,7 @@ model Task {
   updatedAt DateTime @updatedAt
   
   @@index([goalId])
+  @@index([parentTaskId])
 }
 
 // =============================================================================
