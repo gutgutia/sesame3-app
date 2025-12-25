@@ -382,7 +382,7 @@ function GoalSection({
   return (
     <div>
       <h2 className="font-display font-bold text-lg text-text-main mb-4">{title}</h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="space-y-4">
         {goals.map(goal => (
           <GoalCard 
             key={goal.id} 
