@@ -112,7 +112,7 @@ export function AwardForm({ initialData, onSubmit, onCancel }: AwardFormProps) {
         onChange={(e) => setOrganization(e.target.value)}
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Select
           label="Level"
           options={LEVEL_OPTIONS}
@@ -127,7 +127,7 @@ export function AwardForm({ initialData, onSubmit, onCancel }: AwardFormProps) {
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Select
           label="Year Received"
           options={yearOptions}

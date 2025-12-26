@@ -245,10 +245,10 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl h-[80vh] max-h-[700px] bg-white rounded-2xl shadow-float overflow-hidden flex flex-col animate-in zoom-in-95 slide-in-from-bottom-4 duration-200">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full h-full md:h-[85vh] md:max-h-[700px] md:max-w-2xl bg-white rounded-t-2xl md:rounded-2xl shadow-float overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+        <div className="flex items-center justify-between p-4 pt-safe border-b border-border-subtle">
           <div className="flex items-center gap-3">
             {step === "preview" && (
               <button
@@ -372,25 +372,26 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
             <>
               {/* Initial State - Big Text Area */}
               {!hasStarted ? (
-                <div className="flex-1 p-6 flex flex-col">
+                <div className="flex-1 p-6 pb-safe flex flex-col">
                   {/* Brief opener */}
                   <div className="mb-4">
                     <p className="text-lg text-text-main font-medium">{STORY_OPENER}</p>
                   </div>
-                  
-                  {/* Large textarea */}
+
+                  {/* Large textarea - full height on mobile for immersive writing */}
                   <form onSubmit={handleSubmit} className="flex-1 flex flex-col">
                     <textarea
                       ref={inputRef}
                       value={inputValue}
                       onChange={(e) => setInputValue(e.target.value)}
                       placeholder={STORY_INPUT_PLACEHOLDER}
-                      className="flex-1 w-full px-4 py-4 text-[15px] bg-bg-sidebar border border-border-medium rounded-xl text-text-main placeholder:text-text-light resize-none focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-surface min-h-[200px]"
+                      className="flex-1 w-full px-4 py-4 text-[15px] md:text-base bg-bg-sidebar border border-border-medium rounded-xl text-text-main placeholder:text-text-light resize-none focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-surface min-h-[200px]"
                     />
                     <div className="flex justify-end mt-4">
                       <Button
                         type="submit"
                         disabled={!inputValue.trim() || isLoading}
+                        className="w-full sm:w-auto"
                       >
                         {isLoading ? (
                           <Loader2 className="w-4 h-4 animate-spin" />
@@ -440,7 +441,7 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
                   </div>
 
                   {/* Chat Input + Save Button */}
-                  <div className="p-4 border-t border-border-subtle space-y-3">
+                  <div className="p-4 pb-safe border-t border-border-subtle space-y-3">
                     {/* Input Row */}
                     <form onSubmit={handleSubmit} className="flex items-end gap-3">
                       <div className="flex-1 relative">
@@ -495,7 +496,7 @@ export function ShareStoryModal({ isOpen, onClose, onStorySaved }: ShareStoryMod
 
         {/* Preview Footer */}
         {step === "preview" && (
-          <div className="p-4 border-t border-border-subtle flex items-center justify-end gap-3">
+          <div className="p-4 pb-safe border-t border-border-subtle flex items-center justify-end gap-3">
             <Button variant="secondary" onClick={() => setStep("input")}>
               Back to Edit
             </Button>

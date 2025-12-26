@@ -112,10 +112,10 @@ export function AddTaskModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-float overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-md h-[85vh] sm:h-auto sm:max-h-[85vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-float overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+        <div className="flex items-center justify-between p-4 pt-safe border-b border-border-subtle shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-accent-surface rounded-xl flex items-center justify-center">
               <CheckSquare className="w-5 h-5 text-accent-primary" />
@@ -138,7 +138,7 @@ export function AddTaskModal({
         </div>
 
         {/* Content */}
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-4 flex-1 overflow-auto">
           {/* Title */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-text-muted">
@@ -167,7 +167,7 @@ export function AddTaskModal({
           </div>
 
           {/* Due Date & Priority Row */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Due Date */}
             <div className="space-y-2">
               <label className="text-sm font-medium text-text-muted">Due Date</label>
@@ -232,7 +232,7 @@ export function AddTaskModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border-subtle">
+        <div className="p-4 pb-safe border-t border-border-subtle shrink-0">
           <div className="flex gap-3">
             <Button variant="secondary" onClick={onClose} className="flex-1">
               Cancel

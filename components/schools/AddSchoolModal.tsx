@@ -141,10 +141,10 @@ export function AddSchoolModal({ isOpen, onClose, onSchoolAdded }: AddSchoolModa
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-md bg-white rounded-2xl shadow-float overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full h-[90vh] sm:h-auto sm:max-h-[85vh] max-w-md bg-white rounded-t-2xl sm:rounded-2xl shadow-float overflow-hidden flex flex-col animate-in slide-in-from-bottom-4 sm:zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+        <div className="flex items-center justify-between p-4 pt-safe border-b border-border-subtle shrink-0">
           <div>
             <h2 className="font-display font-bold text-lg text-text-main">Add School</h2>
             <p className="text-sm text-text-muted">Search and add to your list</p>
@@ -158,7 +158,7 @@ export function AddSchoolModal({ isOpen, onClose, onSchoolAdded }: AddSchoolModa
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-5">
+        <div className="flex-1 overflow-auto p-4 space-y-5">
           {/* Search Input */}
           <div className="relative">
             <div className="relative">
@@ -286,7 +286,7 @@ export function AddSchoolModal({ isOpen, onClose, onSchoolAdded }: AddSchoolModa
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border-subtle space-y-3">
+        <div className="p-4 pb-safe border-t border-border-subtle space-y-3 shrink-0">
           <div className="flex gap-3">
             <Button variant="secondary" onClick={onClose} className="flex-1">
               Cancel

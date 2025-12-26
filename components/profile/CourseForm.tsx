@@ -138,7 +138,7 @@ export function CourseForm({ initialData, onSubmit, onCancel }: CourseFormProps)
         required
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Select
           label="Subject"
           options={SUBJECT_OPTIONS}
@@ -153,7 +153,7 @@ export function CourseForm({ initialData, onSubmit, onCancel }: CourseFormProps)
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Select
           label="Year Taken"
           options={GRADE_LEVEL_OPTIONS}
@@ -169,7 +169,7 @@ export function CourseForm({ initialData, onSubmit, onCancel }: CourseFormProps)
       </div>
 
       {showGradeField && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Select
             label="Final Grade"
             options={GRADE_OPTIONS}

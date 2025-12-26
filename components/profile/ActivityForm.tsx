@@ -96,7 +96,7 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
         onChange={(e) => setOrganization(e.target.value)}
       />
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Select
           label="Category"
           options={CATEGORY_OPTIONS}
@@ -111,7 +111,7 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
           label="Hours per Week"
           type="number"
