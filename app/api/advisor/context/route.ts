@@ -80,6 +80,14 @@ export async function GET() {
       },
     });
 
+    // Trigger objective generation if none exist (fire-and-forget)
+    if (!context?.generatedObjectives) {
+      import("@/lib/objectives/generate").then(({ triggerObjectiveGeneration }) => {
+        triggerObjectiveGeneration(profileId);
+        console.log(`[AdvisorContext] Triggered initial objective generation for ${profileId}`);
+      }).catch(() => {});
+    }
+
     // Format the response
     const name = profile?.preferredName || profile?.firstName || "Student";
     const gpa =
