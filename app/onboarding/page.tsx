@@ -48,8 +48,7 @@ export default function OnboardingPage() {
   const updateOnboardingData = (updater: (prev: OnboardingData) => OnboardingData) => {
     setOnboardingData(prev => {
       const newData = updater(prev);
-      onboardingDataRef.current = newData; // Update ref synchronously
-      console.log("[Onboarding] Updated data:", newData);
+      onboardingDataRef.current = newData;
       return newData;
     });
   };
@@ -229,8 +228,6 @@ export default function OnboardingPage() {
     try {
       // Use ref for current data (state may be stale due to React async updates)
       const data = onboardingDataRef.current;
-      console.log("[Onboarding] Saving data:", data);
-
       const finalData = dreamSchool
         ? { ...data, dreamSchool }
         : data;
@@ -240,27 +237,17 @@ export default function OnboardingPage() {
       const firstName = nameParts[0] || "Student";
       const lastName = nameParts.slice(1).join(" ") || undefined;
 
-      const payload = {
-        firstName,
-        lastName,
-        grade: parseGrade(data.grade),
-        onboardingData: finalData,
-        onboardingCompletedAt: new Date().toISOString(),
-      };
-      console.log("[Onboarding] Sending to API:", payload);
-
-      const response = await fetch("/api/profile", {
+      await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          grade: parseGrade(data.grade),
+          onboardingData: finalData,
+          onboardingCompletedAt: new Date().toISOString(),
+        }),
       });
-
-      const result = await response.json();
-      console.log("[Onboarding] API response:", response.status, result);
-
-      if (!response.ok) {
-        console.error("Failed to save onboarding data:", result);
-      }
     } catch (err) {
       console.error("Failed to save onboarding data:", err);
     }
