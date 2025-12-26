@@ -44,9 +44,30 @@ export function AdvisorSidebar() {
         if (res.ok) {
           const data = await res.json();
           setContext(data);
+        } else {
+          // Log the actual error for debugging
+          const errorData = await res.json().catch(() => ({}));
+          console.error("Advisor context API error:", res.status, errorData);
+
+          // For 401, set empty context so sidebar still renders
+          if (res.status === 401) {
+            setContext({
+              objectives: [],
+              deadlines: [],
+              commitments: [],
+              sessionInfo: { daysSinceLastSession: null, totalConversations: 0 },
+            });
+          }
         }
       } catch (error) {
         console.error("Failed to load advisor context:", error);
+        // Set empty context on network error to avoid blocking UI
+        setContext({
+          objectives: [],
+          deadlines: [],
+          commitments: [],
+          sessionInfo: { daysSinceLastSession: null, totalConversations: 0 },
+        });
       } finally {
         setIsLoading(false);
       }
@@ -64,9 +85,34 @@ export function AdvisorSidebar() {
   }
 
   if (!context) {
+    // Show a friendly welcome state instead of an error
     return (
-      <div className="p-4 text-center text-text-muted">
-        Unable to load context
+      <div className="flex flex-col gap-4 p-4 text-center">
+        <div className="text-text-muted">
+          <Target className="w-8 h-8 mx-auto mb-2 opacity-50" />
+          <p className="text-sm">Start chatting to build your session context</p>
+        </div>
+      </div>
+    );
+  }
+
+  const hasContent =
+    context.objectives.length > 0 ||
+    context.deadlines.length > 0 ||
+    context.commitments.length > 0;
+
+  // Show welcome state if no content yet
+  if (!hasContent) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center">
+          <Target className="w-8 h-8 text-text-muted opacity-50 mb-3" />
+          <p className="text-sm text-text-secondary mb-1">Your session context</p>
+          <p className="text-xs text-text-muted">
+            As you chat, I&apos;ll track objectives and commitments here
+          </p>
+        </div>
+        <SessionInfo info={context.sessionInfo} />
       </div>
     );
   }

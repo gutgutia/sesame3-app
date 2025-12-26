@@ -1251,7 +1251,7 @@ model GlobalConfig {
   // FEATURE FLAGS
   // ==========================================================================
   
-  enableWidgets             Boolean @default(false)  // In-chat confirmation widgets
+  enableWidgets             Boolean @default(true)   // In-chat confirmation widgets
   enableChancesCalculation  Boolean @default(true)
   enableStoryMode           Boolean @default(true)
   
