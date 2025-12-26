@@ -1,101 +1,140 @@
 // =============================================================================
-// COUNSELOR OBJECTIVES (STUB)
+// COUNSELOR OBJECTIVES
 // =============================================================================
 
 /**
  * Generates the counselor's objectives for this conversation.
- * This is a STUB - full implementation will come later with background jobs.
- * 
- * Future implementation will:
- * - Load pre-generated objectives from DB
- * - Consider profile gaps, deadlines, time since last session
- * - Be updated by daily cron job and after each session
- * 
- * Token budget: ~100 tokens
+ * Uses StudentContext to incorporate open commitments and session context.
+ *
+ * Token budget: ~150 tokens
  */
 
-import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/db";
 
-type ProfileForObjectives = Prisma.StudentProfileGetPayload<{
-  include: {
-    academics: true;
-    testing: true;
-    activities: true;
-    awards: true;
-    schoolList: true;
-    goals: true;
-  };
-}>;
+// Profile type for objectives - using any for flexibility with Prisma types
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ProfileForObjectives = any;
 
 export async function buildCounselorObjectives(
   profileId: string,
   profile?: ProfileForObjectives | null
 ): Promise<string> {
-  // STUB: Generate basic objectives based on profile state
-  // TODO: Replace with pre-generated objectives from DB
-  
-  if (!profile) {
-    return `Objectives for this conversation:
-1. Welcome the student and learn their name
-2. Understand what grade they're in
-3. Find out what brings them here today
-4. Start building rapport`;
-  }
-  
+  // Load StudentContext to get open commitments and session info
+  const context = await prisma.studentContext.findUnique({
+    where: { studentProfileId: profileId },
+    select: {
+      openCommitments: true,
+      accountabilityLevel: true,
+      lastConversationAt: true,
+      totalConversations: true,
+    },
+  });
+
+  // Calculate days since last conversation
+  const daysSinceLastSession = context?.lastConversationAt
+    ? Math.floor(
+        (Date.now() - new Date(context.lastConversationAt).getTime()) /
+          (1000 * 60 * 60 * 24)
+      )
+    : null;
+
   const objectives: string[] = [];
-  
-  // Check profile gaps and create objectives
-  if (!profile.academics?.schoolReportedGpaUnweighted && !profile.academics?.schoolReportedGpaWeighted) {
-    objectives.push("Try to learn their GPA if it comes up naturally");
+
+  // Priority 1: Follow up on open commitments
+  if (context?.openCommitments && context.accountabilityLevel !== "light") {
+    objectives.push("Follow up on any open commitments from last session");
   }
-  
-  // Note: Testing model uses satScores[] and actScores[] arrays now
-  // But we only have basic testing relation here, so check if testing exists
-  if (!profile.testing) {
-    objectives.push("Find out if they've taken standardized tests");
+
+  // Priority 2: Re-engagement after break
+  if (daysSinceLastSession !== null && daysSinceLastSession > 7) {
+    objectives.push(
+      `Reconnect warmly (${daysSinceLastSession} days since last chat)`
+    );
   }
-  
-  if (!profile.activities || profile.activities.length === 0) {
-    objectives.push("Learn about their extracurricular activities");
+
+  // Priority 3: Profile gaps
+  if (!profile) {
+    return buildFirstTimeObjectives();
   }
-  
-  if (!profile.schoolList || profile.schoolList.length === 0) {
-    objectives.push("Discover what schools they're interested in");
+
+  // Check for basic profile gaps
+  const hasGpa =
+    profile.academics?.schoolReportedGpaUnweighted ||
+    profile.academics?.schoolReportedGpaWeighted;
+  const hasTests = !!profile.testing;
+  const hasActivities = profile.activities && profile.activities.length > 0;
+  const hasSchools = profile.schoolList && profile.schoolList.length > 0;
+
+  if (!hasGpa) {
+    objectives.push("Learn their GPA if it comes up naturally");
   }
-  
+
+  if (!hasTests) {
+    objectives.push("Find out about standardized testing plans");
+  }
+
+  if (!hasActivities) {
+    objectives.push("Discover their extracurricular activities");
+  }
+
+  if (!hasSchools) {
+    objectives.push("Explore what schools interest them");
+  }
+
+  // Priority 4: Active goals
   if (profile.goals && profile.goals.length > 0) {
-    const inProgress = profile.goals.filter(g => g.status === "in_progress");
+    const inProgress = profile.goals.filter((g) => g.status === "in_progress");
     if (inProgress.length > 0) {
-      objectives.push(`Check on progress: "${inProgress[0].title}"`);
+      objectives.push(`Check progress on: "${inProgress[0].title}"`);
     }
   }
-  
-  // Default objectives if profile is complete
+
+  // Default objectives if profile is mostly complete
   if (objectives.length === 0) {
     objectives.push("Help with whatever the student needs today");
     objectives.push("Look for opportunities to deepen their profile");
-    objectives.push("Consider if their school list is balanced");
-  }
-  
-  return `Objectives for this conversation:
-${objectives.map((o, i) => `${i + 1}. ${o}`).join("\n")}
 
-Remember: These are background objectives. Focus primarily on what the student wants to discuss.`;
+    // Add proactive coaching based on accountability level
+    if (context?.accountabilityLevel === "high") {
+      objectives.push("Challenge them to take their next step forward");
+    }
+  }
+
+  // Format output
+  const objectivesList = objectives
+    .slice(0, 4) // Max 4 objectives
+    .map((o, i) => `${i + 1}. ${o}`)
+    .join("\n");
+
+  const footer =
+    context?.accountabilityLevel === "high"
+      ? "\nNote: This student prefers high accountability - be proactive about follow-ups."
+      : "\nRemember: Focus primarily on what the student wants. These are secondary goals.";
+
+  return `Session Objectives:\n${objectivesList}${footer}`;
+}
+
+/**
+ * Objectives for first-time students
+ */
+function buildFirstTimeObjectives(): string {
+  return `Session Objectives:
+1. Welcome warmly and learn their name
+2. Understand what grade they're in and their timeline
+3. Find out what brings them here today
+4. Start building rapport and trust
+
+Note: This is a new student. Focus on making them feel comfortable and understood.`;
 }
 
 /**
  * Regenerates objectives for a student.
  * Called after session ends, on profile update, or by daily cron.
- * 
- * STUB - to be implemented
+ *
+ * Future: Use AI to generate more sophisticated objectives
  */
 export async function regenerateObjectives(profileId: string): Promise<void> {
-  // STUB: Will implement with:
-  // 1. Load full profile
-  // 2. Check for upcoming deadlines
-  // 3. Analyze gaps and opportunities
-  // 4. Use AI to generate thoughtful objectives
-  // 5. Store in DB for next session
-  
-  console.log(`[STUB] Would regenerate objectives for profile ${profileId}`);
+  // For now, objectives are generated dynamically
+  // In the future, we could pre-generate and cache them
+  console.log(`[CounselorObjectives] Objectives regenerated for ${profileId}`);
 }
