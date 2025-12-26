@@ -20,6 +20,7 @@ import {
   Briefcase,
   BookOpenCheck,
   MessageSquare,
+  Lightbulb,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/lib/context/ProfileContext";
@@ -58,6 +59,7 @@ const navItems: NavItem[] = [
       { name: "Chances", href: "/chances", icon: Target },
     ]
   },
+  { name: "Opportunities", href: "/opportunities", icon: Lightbulb },
   { name: "Discover", href: "/discover", icon: Search },
 ];
 
