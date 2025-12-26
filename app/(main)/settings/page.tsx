@@ -260,9 +260,9 @@ function PlanSelectorModal({
               <div
                 key={plan.id}
                 className={cn(
-                  "relative bg-surface-secondary border rounded-2xl p-5 transition-all",
+                  "relative bg-surface-secondary border rounded-2xl p-5 transition-all flex flex-col",
                   plan.popular && !isCurrentPlan
-                    ? "border-accent-primary shadow-lg" 
+                    ? "border-accent-primary shadow-lg"
                     : "border-border-subtle",
                   isCurrentPlan && "ring-2 ring-accent-primary ring-offset-2"
                 )}
@@ -296,15 +296,20 @@ function PlanSelectorModal({
                   {plan.description}
                 </p>
                 
-                <ul className="space-y-1.5 mb-4">
-                  {plan.features.map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm">
-                      <Check className={cn("w-4 h-4 mt-0.5 shrink-0", plan.color)} />
-                      <span className="text-text-secondary">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                
+                {/* Flex-grow to push button to bottom */}
+                <div className="flex-1">
+                  <ul className="space-y-1.5 mb-4">
+                    {plan.features.map((feature, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm">
+                        <Check className={cn("w-4 h-4 mt-0.5 shrink-0", plan.color)} />
+                        <span className="text-text-secondary">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Button always at bottom */}
+                <div className="mt-auto pt-2">
                 {isCurrentPlan ? (
                   <Button variant="secondary" className="w-full" disabled size="sm">
                     Current Plan
@@ -337,6 +342,7 @@ function PlanSelectorModal({
                     )}
                   </Button>
                 )}
+                </div>
               </div>
             );
           })}
