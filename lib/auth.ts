@@ -1,15 +1,21 @@
-// Authentication helpers
-// Currently returns mock data for development
-// Will be replaced with real Supabase auth when ready
+/**
+ * Authentication Helpers
+ *
+ * Handles session verification and user retrieval.
+ * Supports both:
+ * - Custom email OTP sessions (sesame_session cookie)
+ * - Development test users (sesame_dev_user_id cookie)
+ */
 
 import { cookies } from "next/headers";
 import { prisma } from "./db";
 
-// Default dev user if none selected
-const DEFAULT_DEV_USER_ID = "test-user-new";
+// Development test users
 const DEV_USER_COOKIE = "sesame_dev_user_id";
+const SESSION_COOKIE = "sesame_session";
+const USER_ID_COOKIE = "sesame_user_id";
 
-// Test user definitions
+// Test user definitions (for development)
 const TEST_USERS: Record<string, { email: string; name: string }> = {
   "test-user-new": { email: "new@test.sesame.com", name: "Alex (New)" },
   "test-user-onboarded": { email: "onboarded@test.sesame.com", name: "Jordan (Onboarded)" },
@@ -23,52 +29,114 @@ export interface AuthUser {
   name?: string;
 }
 
+interface SessionData {
+  userId: string;
+  email: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+/**
+ * Parse and validate session token
+ */
+function parseSession(token: string): SessionData | null {
+  try {
+    const decoded = Buffer.from(token, "base64").toString("utf-8");
+    const session = JSON.parse(decoded) as SessionData;
+
+    // Check expiry
+    if (session.expiresAt < Date.now()) {
+      return null;
+    }
+
+    return session;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Get the current authenticated user
- * For development: reads from cookie or uses default
- * For production: will validate Supabase session
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
-  // TODO: Replace with real Supabase auth in production
-  // const supabase = await createClient();
-  // const { data: { user } } = await supabase.auth.getUser();
-  // if (!user) return null;
-  
-  // For development, check for dev user cookie
   const cookieStore = await cookies();
-  const devUserId = cookieStore.get(DEV_USER_COOKIE)?.value || DEFAULT_DEV_USER_ID;
-  
-  const userInfo = TEST_USERS[devUserId];
-  if (!userInfo) {
-    // Unknown user ID, fall back to default
+
+  // Check for dev user override (development only)
+  if (process.env.NODE_ENV === "development" || process.env.BYPASS_AUTH === "true") {
+    const devUserId = cookieStore.get(DEV_USER_COOKIE)?.value;
+    if (devUserId && TEST_USERS[devUserId]) {
+      return {
+        id: devUserId,
+        email: TEST_USERS[devUserId].email,
+        name: TEST_USERS[devUserId].name,
+      };
+    }
+  }
+
+  // Check for real session
+  const sessionToken = cookieStore.get(SESSION_COOKIE)?.value;
+  if (sessionToken) {
+    const session = parseSession(sessionToken);
+    if (session) {
+      // Verify user exists in database
+      const user = await prisma.user.findUnique({
+        where: { id: session.userId },
+        select: { id: true, email: true, name: true },
+      });
+
+      if (user) {
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name || undefined,
+        };
+      }
+    }
+  }
+
+  // Check for user ID cookie (simpler fallback)
+  const userId = cookieStore.get(USER_ID_COOKIE)?.value;
+  if (userId) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true },
+    });
+
+    if (user) {
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name || undefined,
+      };
+    }
+  }
+
+  // For development with BYPASS_AUTH, fall back to default test user
+  if (process.env.BYPASS_AUTH === "true") {
+    const defaultUserId = "test-user-new";
     return {
-      id: DEFAULT_DEV_USER_ID,
-      email: TEST_USERS[DEFAULT_DEV_USER_ID].email,
-      name: TEST_USERS[DEFAULT_DEV_USER_ID].name,
+      id: defaultUserId,
+      email: TEST_USERS[defaultUserId].email,
+      name: TEST_USERS[defaultUserId].name,
     };
   }
-  
-  return {
-    id: devUserId,
-    email: userInfo.email,
-    name: userInfo.name,
-  };
+
+  return null;
 }
 
 /**
  * Get or create the current user's student profile
- * Returns the profile ID for use in API calls
  */
 export async function getCurrentProfileId(): Promise<string | null> {
   const user = await getCurrentUser();
   if (!user) return null;
-  
+
   // Try to find existing profile
   let profile = await prisma.studentProfile.findFirst({
     where: { userId: user.id },
     select: { id: true },
   });
-  
+
   // If no profile exists, create one
   if (!profile) {
     // First ensure user exists in database
@@ -81,7 +149,7 @@ export async function getCurrentProfileId(): Promise<string | null> {
         name: user.name,
       },
     });
-    
+
     // Create profile
     profile = await prisma.studentProfile.create({
       data: {
@@ -92,7 +160,7 @@ export async function getCurrentProfileId(): Promise<string | null> {
       select: { id: true },
     });
   }
-  
+
   return profile.id;
 }
 
@@ -116,4 +184,14 @@ export async function requireProfile(): Promise<string> {
     throw new Error("Profile not found");
   }
   return profileId;
+}
+
+/**
+ * Clear authentication cookies (for logout)
+ */
+export async function clearAuthCookies(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(SESSION_COOKIE);
+  cookieStore.delete(USER_ID_COOKIE);
+  cookieStore.delete(DEV_USER_COOKIE);
 }
