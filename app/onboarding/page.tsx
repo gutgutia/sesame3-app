@@ -207,28 +207,66 @@ export default function OnboardingPage() {
     }, 800);
   };
 
-  const completeOnboarding = (dreamSchool?: string) => {
+  // Convert grade format: "9th Grade" -> "9th"
+  const parseGrade = (grade?: string): string | undefined => {
+    if (!grade) return undefined;
+    return grade.replace(" Grade", "");
+  };
+
+  // Save onboarding data to the server
+  const saveOnboardingData = async (data: OnboardingData, dreamSchool?: string) => {
+    try {
+      const finalData = dreamSchool
+        ? { ...data, dreamSchool }
+        : data;
+
+      // Parse the name into first/last
+      const nameParts = (data.name || "").trim().split(" ");
+      const firstName = nameParts[0] || "Student";
+      const lastName = nameParts.slice(1).join(" ") || undefined;
+
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          grade: parseGrade(data.grade),
+          onboardingData: finalData,
+          onboardingCompletedAt: new Date().toISOString(),
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to save onboarding data:", err);
+    }
+  };
+
+  const completeOnboarding = async (dreamSchool?: string) => {
     const name = onboardingData.name || "there";
-    
+
     addAssistantMessages([
-      { 
-        text: dreamSchool 
+      {
+        text: dreamSchool
           ? `${dreamSchool} — great choice. I'll help you build a profile that stands out.`
           : "No worries — we'll explore options together as we go."
       },
       { text: `Alright ${name}, I've set up your workspace. Let's get started!` }
     ]);
     setStep(STEPS.COMPLETE);
-    
+
+    // Save to server
+    await saveOnboardingData(onboardingData, dreamSchool);
+
     // Redirect after reading
     setTimeout(() => {
       router.push("/?new=true");
     }, 2500);
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     // Save whatever we have and go to dashboard
     localStorage.setItem("sesame3_onboarding", JSON.stringify(onboardingData));
+    await saveOnboardingData(onboardingData);
     router.push("/?new=true");
   };
 
