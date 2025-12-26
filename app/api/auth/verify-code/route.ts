@@ -108,9 +108,9 @@ export async function POST(request: NextRequest) {
       // Send welcome email (async, don't block)
       sendEmail({
         to: normalizedEmail,
-        subject: "Welcome to Sesame!",
+        subject: "Welcome to Sesame3!",
         react: WelcomeEmail({}),
-        text: "Welcome to Sesame! We're excited to help you on your college prep journey.",
+        text: "Welcome to Sesame3! We're excited to help you on your college prep journey.",
       }).catch((err) => {
         console.error("[Auth] Failed to send welcome email:", err);
       });
