@@ -1,14 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { 
-  Settings, 
-  User, 
-  CreditCard, 
-  Sparkles,
+import {
+  Settings,
+  User,
+  CreditCard,
   Check,
-  Crown,
-  Zap,
   ArrowRight,
   Loader2,
   AlertCircle,
@@ -27,12 +24,11 @@ import {
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/lib/context/ProfileContext";
+import { PLANS, TIER_LEVELS, type SubscriptionTier } from "@/lib/subscription/plans";
 
 // =============================================================================
 // TYPES
 // =============================================================================
-
-type SubscriptionTier = "free" | "standard" | "premium";
 type SubscriptionStatus = "none" | "active" | "canceling" | "past_due";
 
 type SubscriptionData = {
@@ -78,70 +74,6 @@ type ProrationPreview = {
   periodEnd?: string;
 };
 
-// =============================================================================
-// PRICING DATA
-// =============================================================================
-
-const PLANS = [
-  {
-    id: "free" as const,
-    name: "Free",
-    price: 0,
-    priceYearly: 0,
-    description: "Get started with AI-powered college counseling",
-    features: [
-      "20 messages per day",
-      "Basic advisor (Haiku)",
-      "Profile building",
-      "School list management",
-      "Goal tracking",
-    ],
-    icon: Zap,
-    color: "text-gray-500",
-    bgColor: "bg-gray-100",
-  },
-  {
-    id: "standard" as const,
-    name: "Standard",
-    price: 9.99,
-    priceYearly: 99,
-    description: "Deep, personalized guidance for serious students",
-    features: [
-      "100 messages per day",
-      "Advanced advisor (Sonnet)",
-      "Detailed chances analysis",
-      "Priority support",
-      "Everything in Free",
-    ],
-    icon: Sparkles,
-    color: "text-accent-primary",
-    bgColor: "bg-accent-surface",
-    popular: true,
-  },
-  {
-    id: "premium" as const,
-    name: "Premium",
-    price: 24.99,
-    priceYearly: 249,
-    description: "The most powerful AI counselor available",
-    features: [
-      "500 messages per day",
-      "Expert advisor (Opus)",
-      "Comprehensive strategy sessions",
-      "Essay feedback (coming soon)",
-      "Everything in Standard",
-    ],
-    icon: Crown,
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-100",
-  },
-];
-
-const TIER_LEVELS: Record<SubscriptionTier, number> = {
-  free: 0,
-  standard: 1,
-  premium: 2,
-};
 
 // =============================================================================
 // CONFIRMATION MODAL

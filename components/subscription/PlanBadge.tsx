@@ -4,78 +4,12 @@
  * PlanBadge - Shows current plan and upgrade link in sidebar
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Zap, Sparkles, Crown, ArrowRight, X, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
-
-type SubscriptionTier = "free" | "standard" | "premium";
-
-// =============================================================================
-// PRICING DATA (shared with settings page)
-// =============================================================================
-
-const PLANS = [
-  {
-    id: "free" as const,
-    name: "Free",
-    price: 0,
-    priceYearly: 0,
-    description: "Get started with AI-powered college counseling",
-    features: [
-      "AI-powered guidance",
-      "Daily conversation limit",
-      "Profile building tools",
-      "School list tracking",
-      "Goal & task management",
-    ],
-    icon: Zap,
-    color: "text-gray-500",
-    bgColor: "bg-gray-100",
-  },
-  {
-    id: "standard" as const,
-    name: "Standard",
-    price: 9.99,
-    priceYearly: 99,
-    description: "Smarter advice for serious students",
-    features: [
-      "Smarter, deeper advice",
-      "Generous message allowance",
-      "Enhanced reasoning",
-      "Priority support",
-      "All Free features",
-    ],
-    icon: Sparkles,
-    color: "text-accent-primary",
-    bgColor: "bg-accent-surface",
-    popular: true,
-  },
-  {
-    id: "premium" as const,
-    name: "Premium",
-    price: 24.99,
-    priceYearly: 249,
-    description: "The most powerful AI counselor",
-    features: [
-      "Our best AI counselor",
-      "Unlimited conversations",
-      "Expert-level reasoning",
-      "Personalized strategy",
-      "All Standard features",
-    ],
-    icon: Crown,
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-100",
-  },
-];
-
-const TIER_LEVELS: Record<SubscriptionTier, number> = {
-  free: 0,
-  standard: 1,
-  premium: 2,
-};
+import { PLANS, TIER_LEVELS, type SubscriptionTier } from "@/lib/subscription/plans";
 
 // =============================================================================
 // PLAN SELECTOR MODAL
