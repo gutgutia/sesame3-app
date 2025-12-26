@@ -184,10 +184,10 @@ export function NoteEditorModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl max-h-[90vh] bg-white rounded-2xl shadow-float overflow-hidden animate-in zoom-in-95 slide-in-from-bottom-4 duration-200 flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center md:p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-3xl h-full md:h-auto md:max-h-[90vh] bg-white rounded-t-2xl md:rounded-2xl shadow-float overflow-hidden animate-in slide-in-from-bottom-4 md:zoom-in-95 duration-200 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border-subtle flex-shrink-0">
+        <div className="flex items-center justify-between p-4 pt-safe border-b border-border-subtle flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-accent-surface rounded-xl flex items-center justify-center">
               <FileText className="w-5 h-5 text-accent-primary" />
@@ -338,7 +338,7 @@ export function NoteEditorModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border-subtle flex-shrink-0">
+        <div className="p-4 pb-safe border-t border-border-subtle flex-shrink-0">
           <div className="flex gap-3">
             <Button variant="secondary" onClick={onClose} className="flex-1">
               Cancel
