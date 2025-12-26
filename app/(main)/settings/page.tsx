@@ -439,6 +439,8 @@ export default function SettingsPage() {
   const [editSchoolName, setEditSchoolName] = useState("");
   const [editSchoolCity, setEditSchoolCity] = useState("");
   const [editSchoolState, setEditSchoolState] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
+  const [editResidencyStatus, setEditResidencyStatus] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   
   // Confirmation modal state
@@ -757,6 +759,9 @@ export default function SettingsPage() {
     setEditSchoolName(profile?.highSchoolName || "");
     setEditSchoolCity(profile?.highSchoolCity || "");
     setEditSchoolState(profile?.highSchoolState || "");
+    // Format date as YYYY-MM-DD for input[type="date"]
+    setEditBirthDate(profile?.birthDate ? new Date(profile.birthDate).toISOString().split('T')[0] : "");
+    setEditResidencyStatus(profile?.residencyStatus || "");
     setIsEditingProfile(true);
   };
 
@@ -777,6 +782,8 @@ export default function SettingsPage() {
           highSchoolName: editSchoolName,
           highSchoolCity: editSchoolCity,
           highSchoolState: editSchoolState,
+          birthDate: editBirthDate || null,
+          residencyStatus: editResidencyStatus || null,
         }),
       });
 
@@ -797,7 +804,13 @@ export default function SettingsPage() {
   };
 
   const GRADE_OPTIONS = ["9th", "10th", "11th", "12th"];
-  
+
+  const RESIDENCY_OPTIONS = [
+    { value: "us_citizen", label: "U.S. Citizen" },
+    { value: "us_permanent_resident", label: "U.S. Permanent Resident (Green Card)" },
+    { value: "international", label: "International Student" },
+  ];
+
   const US_STATES = [
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
     "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
@@ -1059,6 +1072,56 @@ export default function SettingsPage() {
                           )}
                         </div>
                       )}
+                    </div>
+
+                    {/* Birth Date */}
+                    <div>
+                      <label className="block text-sm font-medium text-text-muted mb-1">
+                        Date of Birth
+                      </label>
+                      {isEditingProfile ? (
+                        <input
+                          type="date"
+                          value={editBirthDate}
+                          onChange={(e) => setEditBirthDate(e.target.value)}
+                          className="w-full px-3 py-2 border border-border-subtle rounded-lg text-text-primary bg-surface-primary focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
+                        />
+                      ) : (
+                        <div className="text-text-primary py-2">
+                          {profile?.birthDate
+                            ? new Date(profile.birthDate).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+                            : "Not set"}
+                        </div>
+                      )}
+                      <p className="text-xs text-text-muted mt-1">
+                        Used to determine eligibility for age-restricted programs
+                      </p>
+                    </div>
+
+                    {/* Residency Status */}
+                    <div>
+                      <label className="block text-sm font-medium text-text-muted mb-1">
+                        Residency Status
+                      </label>
+                      {isEditingProfile ? (
+                        <select
+                          value={editResidencyStatus}
+                          onChange={(e) => setEditResidencyStatus(e.target.value)}
+                          className="w-full px-3 py-2 border border-border-subtle rounded-lg text-text-primary bg-surface-primary focus:outline-none focus:ring-2 focus:ring-accent-primary focus:border-transparent"
+                        >
+                          <option value="">Select status</option>
+                          {RESIDENCY_OPTIONS.map((opt) => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-text-primary py-2">
+                          {RESIDENCY_OPTIONS.find(opt => opt.value === profile?.residencyStatus)?.label || "Not set"}
+                        </div>
+                      )}
+                      <p className="text-xs text-text-muted mt-1">
+                        Some programs are only open to U.S. citizens or permanent residents
+                      </p>
                     </div>
                   </div>
                 </div>

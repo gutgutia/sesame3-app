@@ -16,6 +16,8 @@ export interface ProfileData {
   highSchoolCity?: string | null;
   highSchoolState?: string | null;
   highSchoolType?: string | null;
+  birthDate?: string | null;
+  residencyStatus?: string | null;
   aboutMe?: {
     story?: string | null;
     values?: string[];

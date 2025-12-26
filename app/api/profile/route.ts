@@ -107,7 +107,7 @@ export async function PUT(request: NextRequest) {
     // Only allow updating specific fields
     const allowedFields = [
       "firstName",
-      "lastName", 
+      "lastName",
       "preferredName",
       "grade",
       "graduationYear",
@@ -115,14 +115,21 @@ export async function PUT(request: NextRequest) {
       "highSchoolCity",
       "highSchoolState",
       "highSchoolType",
+      "birthDate",
+      "residencyStatus",
       "onboardingData",
       "onboardingCompletedAt",
     ];
-    
+
     const updateData: Record<string, unknown> = {};
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
-        updateData[field] = body[field];
+        // Handle birthDate specially - convert string to Date
+        if (field === "birthDate" && body[field]) {
+          updateData[field] = new Date(body[field]);
+        } else {
+          updateData[field] = body[field];
+        }
       }
     }
     
