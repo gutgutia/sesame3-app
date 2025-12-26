@@ -78,7 +78,10 @@ model StudentProfile {
   highSchoolCity  String?
   highSchoolState String?
   highSchoolType  String?   // "public" | "private" | "charter" | "homeschool"
-  
+
+  // Personal Info (for eligibility calculations)
+  birthDate       DateTime?   // For age-based program eligibility
+
   // Onboarding State
   onboardingCompletedAt DateTime?
   onboardingData        Json?     // Captured during onboarding flow
@@ -96,9 +99,10 @@ model StudentProfile {
   programs    Program[]
   
   // Relations - Planning
-  goals           Goal[]
-  schoolList      StudentSchool[]
-  
+  goals               Goal[]
+  schoolList          StudentSchool[]
+  summerProgramList   StudentSummerProgram[]
+
   // Relations - AI
   conversations   Conversation[]
   studentContext  StudentContext?
@@ -536,8 +540,178 @@ model School {
   
   // Relations
   studentSchools StudentSchool[]
-  
+
   @@index([name])
+}
+
+// -----------------------------------------------------------------------------
+// SummerProgram - Reference Data (Curated, shared across students)
+// Programs have yearly cycles - deadlines and dates update each year
+// -----------------------------------------------------------------------------
+
+model SummerProgram {
+  id            String @id @default(uuid())
+
+  // Basic Info
+  name          String    // "Stanford Institutes of Medicine Summer Research Program"
+  shortName     String?   // "SIMR"
+  organization  String    // "Stanford Medicine" | "MIT" | "CalTech"
+  description   String?   @db.Text
+  websiteUrl    String?
+
+  // Program Year (deadlines are year-specific)
+  programYear   Int       // 2025, 2026, etc.
+
+  // =========================================================================
+  // ELIGIBILITY - Auto-checkable criteria
+  // =========================================================================
+
+  // Grade eligibility (entering grade OR during program - specify in notes)
+  minGrade      Int?      // 9, 10, 11, 12
+  maxGrade      Int?
+
+  // Age eligibility
+  minAge        Int?      // 14, 15, 16...
+  maxAge        Int?
+
+  // Academic requirements
+  minGpaUnweighted  Float?    // 3.5
+  minGpaWeighted    Float?    // 4.0
+
+  // Citizenship
+  citizenship   String?   // "us_only" | "us_permanent_resident" | "international_ok"
+
+  // =========================================================================
+  // ELIGIBILITY - Course prerequisites (can check against student courses)
+  // =========================================================================
+
+  requiredCourses     String[]  // ["AP Calculus BC", "Chemistry", "Physics"]
+  recommendedCourses  String[]  // ["AP Physics C", "Linear Algebra"]
+
+  // =========================================================================
+  // ELIGIBILITY - Other requirements (display only, student self-assesses)
+  // =========================================================================
+
+  otherRequirements   String[]  // ["Must identify as female", "First-generation only", "Title I school"]
+  eligibilityNotes    String?   // Freeform notes about eligibility
+
+  // =========================================================================
+  // APPLICATION TIMELINE
+  // =========================================================================
+
+  applicationOpens    DateTime?
+  earlyDeadline       DateTime?   // Priority/early deadline if exists
+  applicationDeadline DateTime?   // Primary deadline
+  isRolling           Boolean     @default(false)  // Rolling admissions?
+  rollingNotes        String?     // "Until filled", "Rolling through March 1"
+  notificationDate    DateTime?   // When decisions come out
+
+  // Application details
+  applicationUrl      String?
+  applicationFee      Int?        // In dollars, null if free
+
+  // Application requirements
+  requiresRecs        Boolean     @default(false)
+  requiresTranscript  Boolean     @default(false)
+  requiresEssay       Boolean     @default(false)
+  requiresInterview   Boolean     @default(false)
+  requiresTestScores  Boolean     @default(false)
+  applicationNotes    String?     // Other requirements
+
+  // =========================================================================
+  // PROGRAM DETAILS
+  // =========================================================================
+
+  startDate     DateTime?
+  endDate       DateTime?
+  duration      String?   // "6 weeks", "3 weeks", "8 weeks"
+  format        String?   // "residential" | "commuter" | "online" | "hybrid"
+  location      String?   // "Stanford, CA" | "Cambridge, MA" | "Online"
+
+  // Cost
+  cost          Int?      // Program cost in dollars, null if free
+  stipend       Int?      // If they pay students
+  financialAid  Boolean   @default(false)
+  costNotes     String?   // "Full financial aid available", "Need-based aid"
+
+  // =========================================================================
+  // CLASSIFICATION
+  // =========================================================================
+
+  selectivity   String?   // "highly_selective" | "selective" | "moderate" | "open"
+  acceptanceRate Float?   // 0.0 - 1.0 if known
+  cohortSize    Int?      // How many students accepted
+
+  // Focus areas (for filtering/matching)
+  focusAreas    String[]  // ["STEM", "research", "medicine", "biology", "engineering"]
+
+  // =========================================================================
+  // METADATA
+  // =========================================================================
+
+  isActive      Boolean   @default(true)   // Is this program still running?
+  lastVerified  DateTime?                  // When we last verified the info
+  dataSource    String?                    // "manual" | "website" | "student_report"
+  internalNotes String?                    // Admin notes
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  studentPrograms StudentSummerProgram[]
+
+  @@unique([name, programYear])  // Same program can have multiple year entries
+  @@index([programYear])
+  @@index([applicationDeadline])
+  @@index([minGrade, maxGrade])
+  @@index([isActive])
+}
+
+// -----------------------------------------------------------------------------
+// StudentSummerProgram - Student's tracked summer programs
+// Junction table between StudentProfile and SummerProgram
+// -----------------------------------------------------------------------------
+
+model StudentSummerProgram {
+  id                String @id @default(uuid())
+  studentProfileId  String
+  studentProfile    StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  summerProgramId   String
+  summerProgram     SummerProgram @relation(fields: [summerProgramId], references: [id], onDelete: Cascade)
+
+  // Which year they're tracking/applying for
+  applicationYear   Int
+
+  // Status tracking
+  status            String  @default("interested")
+  // "interested" | "researching" | "preparing" | "applying" | "applied"
+  // | "accepted" | "rejected" | "waitlisted" | "declined" | "attending" | "completed"
+
+  // Student's notes
+  notes             String?   @db.Text
+  whyInterested     String?   // Why this program
+
+  // Application tracking
+  applicationStarted  DateTime?
+  applicationSubmitted DateTime?
+  decisionReceived    DateTime?
+
+  // Outcome (if completed)
+  outcome           String?   @db.Text  // What they accomplished, for profile
+
+  // Link to related goal (optional)
+  relatedGoalId     String?   // If they created a goal for this application
+
+  // Display
+  displayOrder      Int       @default(0)
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@unique([studentProfileId, summerProgramId, applicationYear])
+  @@index([studentProfileId])
+  @@index([status])
+  @@index([applicationYear])
 }
 
 // -----------------------------------------------------------------------------
