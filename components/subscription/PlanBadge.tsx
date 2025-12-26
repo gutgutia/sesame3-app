@@ -24,11 +24,11 @@ const PLANS = [
     priceYearly: 0,
     description: "Get started with AI-powered college counseling",
     features: [
-      "20 messages per day",
-      "Basic advisor (Haiku)",
-      "Profile building",
-      "School list management",
-      "Goal tracking",
+      "AI-powered guidance",
+      "Daily conversation limit",
+      "Profile building tools",
+      "School list tracking",
+      "Goal & task management",
     ],
     icon: Zap,
     color: "text-gray-500",
@@ -41,11 +41,11 @@ const PLANS = [
     priceYearly: 99,
     description: "Smarter advice for serious students",
     features: [
-      "100 messages per day",
-      "Advanced advisor (Sonnet)",
-      "Deeper reasoning",
+      "Smarter, deeper advice",
+      "Generous message allowance",
+      "Enhanced reasoning",
       "Priority support",
-      "Everything in Free",
+      "All Free features",
     ],
     icon: Sparkles,
     color: "text-accent-primary",
@@ -59,11 +59,11 @@ const PLANS = [
     priceYearly: 249,
     description: "The most powerful AI counselor",
     features: [
-      "500 messages per day",
-      "Expert advisor (Opus)",
-      "Best-in-class reasoning",
-      "Essay feedback (coming soon)",
-      "Everything in Standard",
+      "Our best AI counselor",
+      "Unlimited conversations",
+      "Expert-level reasoning",
+      "Personalized strategy",
+      "All Standard features",
     ],
     icon: Crown,
     color: "text-yellow-600",
@@ -271,7 +271,7 @@ function PlanSelectorModal({
                 {/* Flex-grow to push button to bottom */}
                 <div className="flex-1">
                   <ul className="space-y-1.5 mb-4">
-                    {plan.features.slice(0, 3).map((feature, i) => (
+                    {plan.features.map((feature, i) => (
                       <li key={i} className="flex items-start gap-2 text-sm">
                         <Check className={cn("w-4 h-4 mt-0.5 shrink-0", plan.color)} />
                         <span className="text-text-secondary">{feature}</span>
