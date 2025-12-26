@@ -350,41 +350,77 @@ export function PlanBadge() {
 
   if (isLoading) {
     return (
-      <div className="px-3 py-2">
-        <div className="h-10 bg-surface-secondary rounded-lg animate-pulse" />
+      <div className="px-1 mb-2">
+        <div className="h-16 bg-surface-secondary rounded-xl animate-pulse" />
       </div>
     );
   }
 
+  // Render based on tier
+  const renderBadgeContent = () => {
+    switch (currentTier) {
+      case "free":
+        return (
+          <div className="bg-white/60 border border-border-subtle rounded-xl p-3 hover:border-accent-primary/30 transition-colors cursor-pointer" onClick={() => setShowModal(true)}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center bg-gray-100">
+                <Zap className="w-3.5 h-3.5 text-gray-500" />
+              </div>
+              <span className="text-sm font-medium text-text-primary">Free Plan</span>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 py-1.5 bg-accent-surface/60 rounded-lg">
+              <Sparkles className="w-3 h-3 text-accent-primary" />
+              <span className="text-xs text-accent-primary font-medium">
+                Upgrade for smarter advice
+              </span>
+              <ArrowRight className="w-3 h-3 text-accent-primary" />
+            </div>
+          </div>
+        );
+
+      case "standard":
+        return (
+          <div className="bg-white/60 border border-accent-primary/20 rounded-xl p-3 hover:border-accent-primary/40 transition-colors cursor-pointer" onClick={() => setShowModal(true)}>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center bg-accent-surface">
+                <Sparkles className="w-3.5 h-3.5 text-accent-primary" />
+              </div>
+              <span className="text-sm font-medium text-text-primary">Standard Plan</span>
+            </div>
+            <div className="flex items-center justify-center gap-1.5 py-1.5 bg-yellow-50 rounded-lg">
+              <Crown className="w-3 h-3 text-yellow-600" />
+              <span className="text-xs text-yellow-700 font-medium">
+                Go Premium for best advice
+              </span>
+              <ArrowRight className="w-3 h-3 text-yellow-600" />
+            </div>
+          </div>
+        );
+
+      case "premium":
+        return (
+          <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200/60 rounded-xl p-3">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-md flex items-center justify-center bg-yellow-100">
+                <Crown className="w-3.5 h-3.5 text-yellow-600" />
+              </div>
+              <div className="flex-1">
+                <span className="text-sm font-medium text-text-primary">Premium Plan</span>
+                <div className="flex items-center gap-1 mt-0.5">
+                  <Check className="w-3 h-3 text-yellow-600" />
+                  <span className="text-xs text-yellow-700">Best AI counselor</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+    }
+  };
+
   return (
     <>
       <div className="px-1 mb-2">
-        <div className="bg-white/60 border border-border-subtle rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", currentPlan.bgColor)}>
-              <Icon className={cn("w-3.5 h-3.5", currentPlan.color)} />
-            </div>
-            <span className="text-sm font-medium text-text-primary">
-              {currentPlan.name} Plan
-            </span>
-          </div>
-          {currentTier === "free" ? (
-            <button
-              onClick={() => setShowModal(true)}
-              className="w-full text-xs text-accent-primary hover:text-accent-primary/80 font-medium flex items-center justify-center gap-1 py-1.5 bg-accent-surface/50 rounded-lg transition-colors"
-            >
-              Upgrade for smarter advice
-              <ArrowRight className="w-3 h-3" />
-            </button>
-          ) : (
-            <button
-              onClick={() => setShowModal(true)}
-              className="w-full text-xs text-text-muted hover:text-text-primary font-medium py-1.5 transition-colors"
-            >
-              Manage plan
-            </button>
-          )}
-        </div>
+        {renderBadgeContent()}
       </div>
 
       <PlanSelectorModal
