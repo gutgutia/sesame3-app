@@ -4,7 +4,8 @@
  * PlanBadge - Shows current plan and upgrade link in sidebar
  */
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { Zap, Sparkles, Crown, ArrowRight, X, Check, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/Button";
@@ -91,8 +92,34 @@ function PlanSelectorModal({
 }) {
   const [isYearly, setIsYearly] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  if (!isOpen) return null;
+  // Handle mounting for portal
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Handle escape key
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    // Prevent body scroll when modal is open
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "";
+    };
+  }, [isOpen, onClose]);
+
+  if (!isOpen || !mounted) return null;
 
   const currentLevel = TIER_LEVELS[currentTier];
 
@@ -130,9 +157,23 @@ function PlanSelectorModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full p-6 relative animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      onClose();
+    }
+  };
+
+  const modalContent = (
+    <div
+      className="fixed inset-0 bg-black/50 flex items-center justify-center p-4"
+      style={{ zIndex: 9999 }}
+      onClick={handleBackdropClick}
+    >
+      <div
+        className="bg-white rounded-2xl max-w-3xl w-full p-6 relative animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-text-muted hover:text-text-primary transition-colors"
@@ -262,6 +303,9 @@ function PlanSelectorModal({
       </div>
     </div>
   );
+
+  // Use portal to render outside sidebar's stacking context
+  return createPortal(modalContent, document.body);
 }
 
 // =============================================================================
