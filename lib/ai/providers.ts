@@ -34,6 +34,7 @@ export const models = {
   groq: {
     kimiK2: groq("moonshotai/kimi-k2-instruct-0905"),
     qwen32b: groq("qwen/qwen3-32b"),
+    gptOss20b: groq("openai/gpt-oss-20b"), // Ultra-fast, lowest latency for simple parsing
   },
 } as const;
 
@@ -44,6 +45,9 @@ export const models = {
 export const modelFor = {
   // Fast parsing and acknowledgments (~50ms first token)
   fastParsing: models.groq.kimiK2,
+
+  // Ultra-fast onboarding parsing (name, high school) - lowest latency
+  onboardingParsing: models.groq.gptOss20b,
   
   // Deep reasoning and advice (main advisor) - DEFAULT, use getAdvisorForTier for tier-based
   advisor: models.claude.sonnet,

@@ -17,20 +17,19 @@ type Message = {
 type OnboardingData = {
   name?: string;
   grade?: string;
-  feeling?: string;
-  dreamSchool?: string;
-  hasDreamSchool?: boolean;
+  highSchool?: string;
+  // Parsed fields (from LLM)
+  parsedName?: { firstName: string; lastName?: string };
+  parsedHighSchool?: { name: string; city?: string; state?: string };
 };
 
-// Onboarding steps
+// Onboarding steps (simplified: Name -> Grade -> High School -> Complete)
 const STEPS = {
   INTRO: 0,
   NAME: 1,
   GRADE: 2,
-  FEELING: 3,
-  DREAM_SCHOOL_ASK: 4,
-  DREAM_SCHOOL_WHICH: 5,
-  COMPLETE: 6,
+  HIGH_SCHOOL: 3,
+  COMPLETE: 4,
 };
 
 export default function OnboardingPage() {
@@ -40,8 +39,18 @@ export default function OnboardingPage() {
   const [textInput, setTextInput] = useState("");
   const [step, setStep] = useState(STEPS.INTRO);
   const [onboardingData, setOnboardingData] = useState<OnboardingData>({});
+  const onboardingDataRef = useRef<OnboardingData>({}); // Ref for synchronous access
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep ref in sync with state (ref updates synchronously, state is async)
+  const updateOnboardingData = (updater: (prev: OnboardingData) => OnboardingData) => {
+    setOnboardingData(prev => {
+      const newData = updater(prev);
+      onboardingDataRef.current = newData;
+      return newData;
+    });
+  };
 
   // Save data to localStorage whenever it changes
   useEffect(() => {
@@ -89,7 +98,7 @@ export default function OnboardingPage() {
 
   // Focus input when it appears
   useEffect(() => {
-    if (inputRef.current && step === STEPS.NAME) {
+    if (inputRef.current && (step === STEPS.NAME || step === STEPS.HIGH_SCHOOL)) {
       setTimeout(() => inputRef.current?.focus(), 300);
     }
   }, [step, messages]);
@@ -121,114 +130,170 @@ export default function OnboardingPage() {
     processResponse(option);
   };
 
-  const processResponse = (response: string) => {
+  // Parse name using LLM
+  const parseName = async (input: string): Promise<{ firstName: string; lastName?: string }> => {
+    try {
+      const res = await fetch("/api/onboarding/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "name", input }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.error("Failed to parse name:", err);
+    }
+    // Fallback: simple split
+    const parts = input.trim().split(/\s+/);
+    return { firstName: parts[0] || input, lastName: parts.slice(1).join(" ") || undefined };
+  };
+
+  // Parse high school using LLM
+  const parseHighSchool = async (input: string): Promise<{ name: string; city?: string; state?: string }> => {
+    try {
+      const res = await fetch("/api/onboarding/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "highSchool", input }),
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (err) {
+      console.error("Failed to parse high school:", err);
+    }
+    // Fallback: use as-is
+    return { name: input };
+  };
+
+  const processResponse = async (response: string) => {
     addUserMessage(response);
     setIsTyping(true);
 
-    setTimeout(() => {
-      if (step === STEPS.NAME) {
-        // Save name
-        setOnboardingData(prev => ({ ...prev, name: response }));
-        
-        addAssistantMessages([
-          { text: `Great to meet you, ${response}! 👋` },
-          { 
-            text: "What grade are you in?", 
-            options: ["9th Grade", "10th Grade", "11th Grade", "12th Grade"] 
-          }
-        ]);
-        setStep(STEPS.GRADE);
-      }
-      else if (step === STEPS.GRADE) {
-        // Save grade
-        setOnboardingData(prev => ({ ...prev, grade: response }));
-        
-        const gradeMessage = response === "12th Grade" 
-          ? "Senior year — exciting times ahead!" 
-          : response === "11th Grade"
-          ? "Junior year is a big one. You're right on time."
-          : "Great time to start building your story.";
-        
-        addAssistantMessages([
-          { text: gradeMessage },
-          { 
-            text: "How are you feeling about college prep right now?", 
-            options: ["Overwhelmed", "Confident", "Behind", "Just Starting"] 
-          }
-        ]);
-        setStep(STEPS.FEELING);
-      }
-      else if (step === STEPS.FEELING) {
-        // Save feeling
-        setOnboardingData(prev => ({ ...prev, feeling: response }));
-        
-        let feelingResponse = "";
-        if (response === "Overwhelmed") {
-          feelingResponse = "That's completely normal. We're going to break everything down into small, manageable steps.";
-        } else if (response === "Behind") {
-          feelingResponse = "You're not as behind as you think. Let's figure out where you stand together.";
-        } else if (response === "Confident") {
-          feelingResponse = "Love the energy! Let's channel that into a solid plan.";
-        } else {
-          feelingResponse = "Perfect starting point. We'll build this together from scratch.";
-        }
-        
-        addAssistantMessages([
-          { text: feelingResponse },
-          { 
-            text: "Do you have a dream school in mind?", 
-            options: ["Yes, I do", "Still exploring"] 
-          }
-        ]);
-        setStep(STEPS.DREAM_SCHOOL_ASK);
-      }
-      else if (step === STEPS.DREAM_SCHOOL_ASK) {
-        if (response === "Yes, I do") {
-          setOnboardingData(prev => ({ ...prev, hasDreamSchool: true }));
-          addAssistantMessages([
-            { 
-              text: "Which school is at the top of your list?",
-              inputType: "text-optional",
-              inputPlaceholder: "e.g., Stanford, MIT, UCLA..."
-            }
-          ]);
-          setStep(STEPS.DREAM_SCHOOL_WHICH);
-        } else {
-          setOnboardingData(prev => ({ ...prev, hasDreamSchool: false }));
-          completeOnboarding();
-        }
-      }
-      else if (step === STEPS.DREAM_SCHOOL_WHICH) {
-        setOnboardingData(prev => ({ ...prev, dreamSchool: response }));
-        completeOnboarding(response);
-      }
+    // Small delay for natural feel
+    await new Promise(resolve => setTimeout(resolve, 400));
 
-      setIsTyping(false);
-    }, 800);
+    if (step === STEPS.NAME) {
+      // Parse name with LLM
+      const parsed = await parseName(response);
+      const displayName = parsed.firstName;
+
+      updateOnboardingData(prev => ({
+        ...prev,
+        name: response,
+        parsedName: parsed,
+      }));
+
+      addAssistantMessages([
+        { text: `Great to meet you, ${displayName}! 👋` },
+        {
+          text: "What grade are you in?",
+          options: ["9th Grade", "10th Grade", "11th Grade", "12th Grade"]
+        }
+      ]);
+      setStep(STEPS.GRADE);
+    }
+    else if (step === STEPS.GRADE) {
+      updateOnboardingData(prev => ({ ...prev, grade: response }));
+
+      const gradeMessage = response === "12th Grade"
+        ? "Senior year — exciting times ahead!"
+        : response === "11th Grade"
+        ? "Junior year is a big one. You're right on time."
+        : "Great time to start building your story.";
+
+      addAssistantMessages([
+        { text: gradeMessage },
+        {
+          text: "What high school do you go to?",
+          inputType: "text",
+          inputPlaceholder: "e.g., Lincoln High, San Jose, CA"
+        }
+      ]);
+      setStep(STEPS.HIGH_SCHOOL);
+    }
+    else if (step === STEPS.HIGH_SCHOOL) {
+      // Parse high school with LLM
+      const parsed = await parseHighSchool(response);
+
+      updateOnboardingData(prev => ({
+        ...prev,
+        highSchool: response,
+        parsedHighSchool: parsed,
+      }));
+
+      completeOnboarding();
+    }
+
+    setIsTyping(false);
   };
 
-  const completeOnboarding = (dreamSchool?: string) => {
-    const name = onboardingData.name || "there";
-    
+  // Convert grade format: "9th Grade" -> "9th"
+  const parseGrade = (grade?: string): string | undefined => {
+    if (!grade) return undefined;
+    return grade.replace(" Grade", "");
+  };
+
+  // Save onboarding data to the server
+  const saveOnboardingData = async () => {
+    try {
+      // Use ref for current data (state may be stale due to React async updates)
+      const data = onboardingDataRef.current;
+
+      // Use LLM-parsed name if available, otherwise fallback
+      const firstName = data.parsedName?.firstName || "Student";
+      const lastName = data.parsedName?.lastName || undefined;
+
+      // Use LLM-parsed high school if available
+      const highSchoolName = data.parsedHighSchool?.name || undefined;
+      const highSchoolCity = data.parsedHighSchool?.city || undefined;
+      const highSchoolState = data.parsedHighSchool?.state || undefined;
+
+      await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          grade: parseGrade(data.grade),
+          highSchoolName,
+          highSchoolCity,
+          highSchoolState,
+          onboardingData: data,
+          onboardingCompletedAt: new Date().toISOString(),
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to save onboarding data:", err);
+    }
+  };
+
+  const completeOnboarding = async () => {
+    // Use parsed name for display
+    const data = onboardingDataRef.current;
+    const displayName = data.parsedName?.firstName || "there";
+    const schoolName = data.parsedHighSchool?.name || "your school";
+
     addAssistantMessages([
-      { 
-        text: dreamSchool 
-          ? `${dreamSchool} — great choice. I'll help you build a profile that stands out.`
-          : "No worries — we'll explore options together as we go."
-      },
-      { text: `Alright ${name}, I've set up your workspace. Let's get started!` }
+      { text: `${schoolName} — great! I'll keep that in mind as we plan together.` },
+      { text: `Alright ${displayName}, I've set up your workspace. Let's get started!` }
     ]);
     setStep(STEPS.COMPLETE);
-    
+
+    // Save to server (uses ref internally for current data)
+    await saveOnboardingData();
+
     // Redirect after reading
     setTimeout(() => {
       router.push("/?new=true");
     }, 2500);
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     // Save whatever we have and go to dashboard
-    localStorage.setItem("sesame3_onboarding", JSON.stringify(onboardingData));
+    localStorage.setItem("sesame3_onboarding", JSON.stringify(onboardingDataRef.current));
+    await saveOnboardingData();
     router.push("/?new=true");
   };
 

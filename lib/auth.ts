@@ -57,23 +57,17 @@ function parseSession(token: string): SessionData | null {
 
 /**
  * Get the current authenticated user
+ *
+ * Priority order:
+ * 1. Real session (sesame_session cookie) - always takes precedence
+ * 2. User ID cookie (sesame_user_id) - fallback for real users
+ * 3. Dev user override (sesame_dev_user_id) - only in development, only if no real session
+ * 4. Default test user - only with BYPASS_AUTH and no other auth
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
 
-  // Check for dev user override (development only)
-  if (process.env.NODE_ENV === "development" || process.env.BYPASS_AUTH === "true") {
-    const devUserId = cookieStore.get(DEV_USER_COOKIE)?.value;
-    if (devUserId && TEST_USERS[devUserId]) {
-      return {
-        id: devUserId,
-        email: TEST_USERS[devUserId].email,
-        name: TEST_USERS[devUserId].name,
-      };
-    }
-  }
-
-  // Check for real session
+  // Check for real session FIRST - real users always take priority
   const sessionToken = cookieStore.get(SESSION_COOKIE)?.value;
   if (sessionToken) {
     const session = parseSession(sessionToken);
@@ -94,7 +88,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     }
   }
 
-  // Check for user ID cookie (simpler fallback)
+  // Check for user ID cookie (simpler fallback for real users)
   const userId = cookieStore.get(USER_ID_COOKIE)?.value;
   if (userId) {
     const user = await prisma.user.findUnique({
@@ -107,6 +101,18 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         id: user.id,
         email: user.email,
         name: user.name || undefined,
+      };
+    }
+  }
+
+  // Check for dev user override (development only, when no real session exists)
+  if (process.env.NODE_ENV === "development" || process.env.BYPASS_AUTH === "true") {
+    const devUserId = cookieStore.get(DEV_USER_COOKIE)?.value;
+    if (devUserId && TEST_USERS[devUserId]) {
+      return {
+        id: devUserId,
+        email: TEST_USERS[devUserId].email,
+        name: TEST_USERS[devUserId].name,
       };
     }
   }
