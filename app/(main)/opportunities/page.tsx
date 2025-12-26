@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import {
   Sun,
   FlaskConical,
@@ -21,6 +22,7 @@ import {
   AlertCircle,
   CheckCircle2,
   HelpCircle,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -389,12 +391,12 @@ function ProgramCard({
     <div className="bg-white border border-border-subtle rounded-[20px] p-5 shadow-card hover:shadow-lg transition-shadow">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0">
-          <h3 className="font-display font-bold text-text-main truncate">
+        <Link href={`/summer-programs/${program.id}`} className="flex-1 min-w-0 group">
+          <h3 className="font-display font-bold text-text-main truncate group-hover:text-accent-primary transition-colors">
             {program.shortName || program.name}
           </h3>
           <p className="text-sm text-text-muted truncate">{program.organization}</p>
-        </div>
+        </Link>
 
         {/* Menu */}
         <div className="relative">
@@ -408,6 +410,14 @@ function ProgramCard({
             <>
               <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
               <div className="absolute right-0 top-full mt-1 bg-white border border-border-subtle rounded-xl shadow-lg z-20 py-1 min-w-[140px]">
+                <Link
+                  href={`/summer-programs/${program.id}`}
+                  className="flex items-center gap-2 px-3 py-2 text-sm text-text-primary hover:bg-surface-secondary transition-colors"
+                  onClick={() => setShowMenu(false)}
+                >
+                  <FileText className="w-4 h-4" />
+                  View Details
+                </Link>
                 {program.websiteUrl && (
                   <a
                     href={program.websiteUrl}
@@ -639,8 +649,12 @@ function AddProgramModal({
                       : "border-border-subtle hover:border-accent-primary"
                   )}
                 >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-text-primary truncate">
+                  <Link
+                    href={`/summer-programs/${program.id}`}
+                    className="flex-1 min-w-0 group"
+                    onClick={onClose}
+                  >
+                    <div className="font-medium text-text-primary truncate group-hover:text-accent-primary transition-colors">
                       {program.shortName ? `${program.shortName} - ${program.name}` : program.name}
                     </div>
                     <div className="text-sm text-text-muted truncate">{program.organization}</div>
@@ -658,7 +672,7 @@ function AddProgramModal({
                         <span className="capitalize">{program.selectivity.replace("_", " ")}</span>
                       )}
                     </div>
-                  </div>
+                  </Link>
                   {program.isTracked ? (
                     <div className="flex items-center gap-1.5 text-sm text-green-600 font-medium">
                       <Check className="w-4 h-4" />
