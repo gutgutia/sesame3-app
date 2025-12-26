@@ -1,8 +1,62 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
 
-const protectedRoutes = ["/", "/plan", "/profile", "/schools", "/discover", "/advisor", "/chances", "/settings"];
+const protectedRoutes = ["/", "/plan", "/profile", "/schools", "/discover", "/advisor", "/chances", "/settings", "/onboarding", "/opportunities", "/summer-programs"];
 const authRoutes = ["/login", "/auth"];
+
+// Session cookie names
+const SESSION_COOKIE = "sesame_session";
+const USER_ID_COOKIE = "sesame_user_id";
+const DEV_USER_COOKIE = "sesame_dev_user_id";
+
+interface SessionData {
+  userId: string;
+  email: string;
+  createdAt: number;
+  expiresAt: number;
+}
+
+function parseSession(token: string): SessionData | null {
+  try {
+    const decoded = Buffer.from(token, "base64").toString("utf-8");
+    const session = JSON.parse(decoded) as SessionData;
+
+    // Check expiry
+    if (session.expiresAt < Date.now()) {
+      return null;
+    }
+
+    return session;
+  } catch {
+    return null;
+  }
+}
+
+function isAuthenticated(request: NextRequest): boolean {
+  // Check for dev user cookie (development only)
+  if (process.env.NODE_ENV === "development") {
+    const devUserId = request.cookies.get(DEV_USER_COOKIE)?.value;
+    if (devUserId) {
+      return true;
+    }
+  }
+
+  // Check for session cookie
+  const sessionToken = request.cookies.get(SESSION_COOKIE)?.value;
+  if (sessionToken) {
+    const session = parseSession(sessionToken);
+    if (session) {
+      return true;
+    }
+  }
+
+  // Check for user ID cookie (fallback)
+  const userId = request.cookies.get(USER_ID_COOKIE)?.value;
+  if (userId) {
+    return true;
+  }
+
+  return false;
+}
 
 export async function middleware(request: NextRequest) {
   // Development bypass - set BYPASS_AUTH=true in .env.local for easy local dev
@@ -10,8 +64,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
+  const authenticated = isAuthenticated(request);
 
   const isProtectedRoute = protectedRoutes.some(
     (route) => pathname === route || pathname.startsWith(route + "/")
@@ -22,7 +76,7 @@ export async function middleware(request: NextRequest) {
   );
 
   // Redirect to login if accessing protected route without auth
-  if (isProtectedRoute && !user) {
+  if (isProtectedRoute && !authenticated) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirect", pathname);
@@ -30,13 +84,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect to home if accessing auth routes while logged in
-  if (isAuthRoute && user) {
+  if (isAuthRoute && authenticated) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);
   }
 
-  return supabaseResponse;
+  return NextResponse.next();
 }
 
 export const config = {
