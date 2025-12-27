@@ -59,10 +59,26 @@ Return a JSON object:
 - addActivity: { title, organization, category?, isLeadership?, description? }
 - addAward: { title, level, organization?, year? }
 - uploadTranscript: {} - Use when user wants to share/upload transcript, courses, classes, or schedule
-- addProgram: { name, organization?, type, status }
+- addProgram: { name, organization?, type, status } - ONLY for specific named programs
 - addSchoolToList: { schoolName, tier?, whyInterested? }
 - saveProfileInfo: { firstName?, lastName?, preferredName?, grade?, highSchoolName? }
 - addGoal: { title, category, targetDate? }
+
+## Programs vs Goals - IMPORTANT DISTINCTION
+- addProgram: Use ONLY when user mentions a SPECIFIC, NAMED program they have attended or are applying to
+  - Examples that SHOULD trigger addProgram:
+    - "I attended RSI last summer" → addProgram { name: "RSI", status: "completed" }
+    - "I got into MOSTEC" → addProgram { name: "MOSTEC", status: "accepted" }
+    - "I'm applying to SSP" → addProgram { name: "SSP", status: "applying" }
+
+- addGoal: Use when user expresses a GENERIC intention or goal about programs (no specific name)
+  - Examples that SHOULD trigger addGoal:
+    - "I plan to get into a summer research program" → addGoal { title: "Get into summer research program", category: "research" }
+    - "I want to do an internship next summer" → addGoal { title: "Do internship next summer", category: "research" }
+    - "I hope to participate in a science olympiad" → addGoal { title: "Participate in science olympiad", category: "competition" }
+
+- NO TOOL: When user asks a question about programs, let the Advisor handle it
+  - Examples: "What summer programs should I apply to?", "Which research programs are good for CS?"
 
 ## Transcript Upload
 When user mentions courses, classes, schedule, transcript, or wants to share their courseload:

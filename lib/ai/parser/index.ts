@@ -182,6 +182,8 @@ export function shouldParse(message: string): boolean {
     "program", "summer", "internship", "research", "camp", "institute",
     "rsi", "ssp", "simr", "mostec", "tasp", "telluride", "yygs", "sra",
     "attending", "accepted to", "applied to", "applying",
+    // Goals and intentions
+    "goal", "plan to", "want to", "hope to", "aiming", "target", "aspire",
   ];
   
   const hasKeyword = dataKeywords.some(keyword => {
