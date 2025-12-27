@@ -36,37 +36,61 @@ export async function POST(request: NextRequest) {
   try {
     const profileId = await requireProfile();
     const body = await request.json();
-    
+
+    // Validate: need at least some score data
+    if (!body.math && !body.reading && !body.total) {
+      return NextResponse.json(
+        { error: "At least math, reading, or total score is required" },
+        { status: 400 }
+      );
+    }
+
     // Get or create Testing container
     const testing = await prisma.testing.upsert({
       where: { studentProfileId: profileId },
       create: { studentProfileId: profileId },
       update: {},
     });
-    
-    // Calculate total from sections
-    const total = (body.math || 0) + (body.reading || 0);
-    
+
+    // Parse scores
+    const math = body.math ? parseInt(body.math) : null;
+    const reading = body.reading ? parseInt(body.reading) : null;
+    const total = body.total ? parseInt(body.total) : ((math || 0) + (reading || 0));
+
+    // Parse test date, default to today if not provided or invalid
+    let testDate: Date;
+    if (body.testDate) {
+      testDate = new Date(body.testDate);
+      if (isNaN(testDate.getTime())) {
+        testDate = new Date();
+      }
+    } else {
+      testDate = new Date();
+    }
+
     const satScore = await prisma.sATScore.create({
       data: {
         testingId: testing.id,
         total,
-        math: body.math,
-        reading: body.reading,
-        essay: body.essay,
-        testDate: new Date(body.testDate),
+        math,
+        reading,
+        essay: body.essay ? parseInt(body.essay) : null,
+        testDate,
         isSuperscored: body.isSuperscored || false,
         isPrimary: body.isPrimary || false,
       },
     });
-    
+
     return NextResponse.json(satScore, { status: 201 });
   } catch (error) {
     if (error instanceof Error && error.message === "Profile not found") {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
     console.error("Error creating SAT score:", error);
-    return NextResponse.json({ error: "Failed to create SAT score" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create SAT score", details: error instanceof Error ? error.message : "Unknown" },
+      { status: 500 }
+    );
   }
 }
 

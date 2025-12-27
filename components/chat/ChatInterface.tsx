@@ -234,14 +234,16 @@ export function ChatInterface({
             try {
               const eventData = JSON.parse(eventMatch[1]);
               if (eventData.type === "widget" && eventData.widget) {
+                // Normalize widget data (parser uses satTotal/satMath/satReading, API uses total/math/reading)
+                const normalizedData = normalizeWidgetData(eventData.widget.type, eventData.widget.data);
                 const widget: PendingWidget = {
                   id: `widget-${Date.now()}`,
                   type: eventData.widget.type as WidgetType,
-                  data: eventData.widget.data,
+                  data: normalizedData,
                   status: "pending",
                 };
                 setPendingWidgets(prev => [...prev, widget]);
-                console.log("[Chat] Widget from Parser:", widget.type);
+                console.log("[Chat] Widget from Parser:", widget.type, normalizedData);
               }
             } catch (e) {
               console.error("[Chat] Failed to parse widget event:", e);
@@ -536,6 +538,36 @@ function getApiEndpoint(widgetType: WidgetType): string | null {
 }
 
 function getApiMethod(widgetType: WidgetType): string {
-  const postTypes: WidgetType[] = ["activity", "award", "program", "goal", "school"];
+  const postTypes: WidgetType[] = ["activity", "award", "program", "goal", "school", "sat", "act"];
   return postTypes.includes(widgetType) ? "POST" : "PUT";
+}
+
+/**
+ * Normalize widget data from parser format to API format.
+ * Parser uses: satTotal, satMath, satReading, actComposite, etc.
+ * API uses: total, math, reading, composite, etc.
+ */
+function normalizeWidgetData(widgetType: string, data: Record<string, unknown>): Record<string, unknown> {
+  if (widgetType === "sat") {
+    return {
+      total: data.satTotal ?? data.total,
+      math: data.satMath ?? data.math,
+      reading: data.satReading ?? data.reading,
+      testDate: data.testDate,
+    };
+  }
+
+  if (widgetType === "act") {
+    return {
+      composite: data.actComposite ?? data.composite,
+      english: data.actEnglish ?? data.english,
+      math: data.actMath ?? data.math,
+      reading: data.actReading ?? data.reading,
+      science: data.actScience ?? data.science,
+      testDate: data.testDate,
+    };
+  }
+
+  // For other widget types, return data as-is
+  return data;
 }
