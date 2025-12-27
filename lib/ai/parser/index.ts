@@ -177,6 +177,10 @@ export function shouldParse(message: string): boolean {
     "my name", "i'm in", "i am a", "junior", "senior", "sophomore", "freshman",
     // Courses
     "taking", "ap ", "ib ", "honors",
+    // Programs (summer programs, research, internships)
+    "program", "summer", "internship", "research", "camp", "institute",
+    "rsi", "ssp", "simr", "mostec", "tasp", "telluride", "yygs", "sra",
+    "attending", "accepted to", "applied to", "applying",
   ];
   
   const hasKeyword = dataKeywords.some(keyword => {
