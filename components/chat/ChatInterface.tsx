@@ -443,26 +443,30 @@ export function ChatInterface({
         {/* Current pending widget */}
         {currentWidget && !isLoading && (
           <div className="flex justify-start">
-            <div className="max-w-md w-full">
-              {isRecommendationWidget(currentWidget.type) ? (
+            {isRecommendationWidget(currentWidget.type) ? (
+              // Recommendation widgets use full width for better carousel display
+              <div className="w-full max-w-3xl">
                 <RecommendationCarousel
                   type={currentWidget.type as "program_recommendations" | "school_recommendations"}
-                  data={currentWidget.data as { focusArea?: string; tier?: string }}
+                  data={currentWidget.data as { focusArea?: string; tier?: string; schools?: string[]; programs?: string[] }}
                   onAddToList={() => {
                     // Optionally track adds
                     onProfileUpdate?.();
                   }}
                   onDismiss={() => handleWidgetDismiss(currentWidget.id)}
                 />
-              ) : (
+              </div>
+            ) : (
+              // Regular confirmation widgets are narrower
+              <div className="max-w-md w-full">
                 <ConfirmationWidget
                   type={currentWidget.type}
                   data={currentWidget.data}
                   onConfirm={(data) => handleWidgetConfirm(currentWidget.id, data)}
                   onDismiss={() => handleWidgetDismiss(currentWidget.id)}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </div>
         )}
         

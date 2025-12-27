@@ -311,12 +311,12 @@ function ProgramCard({
 
   return (
     <div
-      className="flex-shrink-0 w-64 bg-white rounded-xl border border-border-subtle p-4 shadow-sm hover:shadow-md transition-shadow"
+      className="flex-shrink-0 w-72 bg-white rounded-xl border border-border-subtle p-4 shadow-sm hover:shadow-md transition-shadow"
       style={{ scrollSnapAlign: "start" }}
     >
       {/* Header */}
       <div className="mb-3">
-        <h4 className="font-semibold text-text-main text-sm line-clamp-1">
+        <h4 className="font-semibold text-text-main text-sm line-clamp-2">
           {program.shortName || program.name}
         </h4>
         <p className="text-xs text-text-muted line-clamp-1">{program.organization}</p>
@@ -427,12 +427,12 @@ function SchoolCard({
 
   return (
     <div
-      className="flex-shrink-0 w-64 bg-white rounded-xl border border-border-subtle p-4 shadow-sm hover:shadow-md transition-shadow"
+      className="flex-shrink-0 w-72 bg-white rounded-xl border border-border-subtle p-4 shadow-sm hover:shadow-md transition-shadow"
       style={{ scrollSnapAlign: "start" }}
     >
       {/* Header */}
       <div className="mb-3">
-        <h4 className="font-semibold text-text-main text-sm line-clamp-1">
+        <h4 className="font-semibold text-text-main text-sm line-clamp-2">
           {school.shortName || school.name}
         </h4>
         {school.city && school.state && (
