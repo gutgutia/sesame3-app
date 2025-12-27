@@ -2,15 +2,17 @@ import { streamText } from "ai";
 import { NextRequest } from "next/server";
 import { requireProfile } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { 
-  allTools, 
-  assembleContext, 
+import {
+  allTools,
+  assembleContext,
   parseUserMessage,
   shouldParse,
   formatParserContextForAdvisor,
   getAdvisorForTier,
   getAdvisorModelName,
   getTierModelType,
+  isRecommendationTool,
+  getWidgetTypeFromToolName,
   type EntryMode,
   type ParserResponse,
   type SubscriptionTier,
@@ -169,7 +171,7 @@ export async function POST(request: NextRequest) {
               // Estimate output tokens
               totalOutputTokens = usage?.outputTokens || Math.ceil(text.length / 4);
               const actualInputTokens = usage?.inputTokens || estimatedInputTokens;
-              
+
               // Record usage for advisor
               await recordUsage({
                 userId,
@@ -178,7 +180,7 @@ export async function POST(request: NextRequest) {
                 tokensOutput: totalOutputTokens,
                 messageCount: 1,
               }).catch(err => console.error("Error recording advisor usage:", err));
-              
+
               // Record usage for parser (if used)
               if (parserTokens.input > 0) {
                 await recordUsage({
@@ -189,7 +191,7 @@ export async function POST(request: NextRequest) {
                   messageCount: 0, // Don't double-count messages
                 }).catch(err => console.error("Error recording parser usage:", err));
               }
-              
+
               // Save to database in background
               saveConversation({
                 profileId,
@@ -205,14 +207,46 @@ export async function POST(request: NextRequest) {
               }).catch(err => console.error("Error saving conversation:", err));
             },
           });
-          
-          // Get the text stream
-          const textStream = result.textStream;
-          
-          // Stream text chunks
-          for await (const chunk of textStream) {
-            if (chunk) {
-              controller.enqueue(encoder.encode(chunk));
+
+          // Use fullStream to capture both text and tool calls
+          const fullStream = result.fullStream;
+
+          // Stream events - handle text and tool calls
+          for await (const event of fullStream) {
+            if (event.type === "text-delta") {
+              // Stream text chunks - AI SDK v5 uses 'text' property
+              if (event.text) {
+                controller.enqueue(encoder.encode(event.text));
+              }
+            } else if (event.type === "tool-call") {
+              // Handle tool calls - emit widget events for recommendation tools
+              const toolName = event.toolName;
+              if (featureFlags.enableWidgets && isRecommendationTool(toolName)) {
+                const widgetType = getWidgetTypeFromToolName(toolName);
+                if (widgetType) {
+                  // Build widget data from tool input (AI SDK v5 uses 'input' not 'args')
+                  const widgetData: Record<string, unknown> = {};
+                  const input = "input" in event ? event.input : {};
+                  if (toolName === "showSchoolRecommendations") {
+                    // Pass school names to the widget for API lookup
+                    widgetData.schools = (input as { schools?: string[] }).schools || [];
+                    widgetData.reason = (input as { reason?: string }).reason;
+                  } else if (toolName === "showProgramRecommendations") {
+                    // Pass program names to the widget for API lookup
+                    widgetData.programs = (input as { programs?: string[] }).programs || [];
+                    widgetData.reason = (input as { reason?: string }).reason;
+                  }
+
+                  const widgetEvent = JSON.stringify({
+                    type: "widget",
+                    widget: {
+                      type: widgetType,
+                      data: widgetData,
+                    },
+                  });
+                  controller.enqueue(encoder.encode(`event: widget\ndata: ${widgetEvent}\n\n`));
+                }
+              }
             }
           }
           

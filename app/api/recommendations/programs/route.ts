@@ -3,6 +3,14 @@ import { prisma } from "@/lib/db";
 import { getCurrentProfileId } from "@/lib/auth";
 import { calculateEligibility, type EligibilityStatus } from "@/lib/eligibility/calculate-eligibility";
 
+/**
+ * GET - Fetch programs by names (provided by LLM) or discover based on profile
+ *
+ * Query params:
+ * - programs: Comma-separated program names from LLM (e.g., "RSI,MITES,Stanford SIMR")
+ * - focus: Filter by focus area (e.g., "research", "STEM") - only for discovery mode
+ * - limit: Max results
+ */
 export async function GET(request: Request) {
   try {
     const profileId = await getCurrentProfileId();
@@ -12,6 +20,7 @@ export async function GET(request: Request) {
 
     // Parse query params
     const url = new URL(request.url);
+    const programNames = url.searchParams.get("programs"); // LLM-provided names
     const focusArea = url.searchParams.get("focus"); // e.g., "research", "STEM"
     const limit = parseInt(url.searchParams.get("limit") || "6");
 
@@ -33,26 +42,56 @@ export async function GET(request: Request) {
     // Get current year for program filtering
     const currentYear = new Date().getFullYear();
 
-    // Build query for summer programs
-    const whereClause: Record<string, unknown> = {
-      isActive: true,
-      programYear: { gte: currentYear },
-    };
+    let programs;
 
-    // Filter by focus area if specified
-    if (focusArea) {
-      whereClause.focusAreas = { has: focusArea.toLowerCase() };
+    if (programNames) {
+      // MODE 1: LLM provided specific program names - look them up
+      const names = programNames.split(",").map(n => n.trim());
+
+      // Search for programs by name (fuzzy match)
+      programs = await prisma.summerProgram.findMany({
+        where: {
+          OR: names.flatMap(name => [
+            { name: { contains: name, mode: "insensitive" } },
+            { shortName: { contains: name, mode: "insensitive" } },
+          ]),
+          isActive: true,
+        },
+        take: limit,
+      });
+
+      // Sort by the order the LLM provided (if possible)
+      const nameOrder = new Map(names.map((n, i) => [n.toLowerCase(), i]));
+      programs.sort((a, b) => {
+        const aOrder = nameOrder.get(a.name.toLowerCase()) ??
+                       nameOrder.get(a.shortName?.toLowerCase() || "") ?? 999;
+        const bOrder = nameOrder.get(b.name.toLowerCase()) ??
+                       nameOrder.get(b.shortName?.toLowerCase() || "") ?? 999;
+        return aOrder - bOrder;
+      });
+    } else {
+      // MODE 2: Discovery mode - find programs based on profile
+      // Build query for summer programs
+      const whereClause: Record<string, unknown> = {
+        isActive: true,
+        programYear: { gte: currentYear },
+      };
+
+      // Filter by focus area if specified
+      if (focusArea) {
+        whereClause.focusAreas = { has: focusArea.toLowerCase() };
+      }
+
+      // Fetch programs
+      programs = await prisma.summerProgram.findMany({
+        where: whereClause,
+        orderBy: [
+          { applicationDeadline: "asc" }, // Upcoming deadlines first
+          { selectivity: "asc" },
+        ],
+        take: 50, // Get more than needed for filtering
+      });
     }
-
-    // Fetch programs
-    const programs = await prisma.summerProgram.findMany({
-      where: whereClause,
-      orderBy: [
-        { applicationDeadline: "asc" }, // Upcoming deadlines first
-        { selectivity: "asc" },
-      ],
-      take: 50, // Get more than needed for filtering
-    });
 
     // Calculate eligibility for each program and score them
     const programsWithEligibility = programs.map(program => {
@@ -94,28 +133,12 @@ export async function GET(request: Request) {
       };
     });
 
-    // Filter to eligible or check_required, prioritize by eligibility
-    const eligibilityOrder: Record<EligibilityStatus, number> = {
-      eligible: 0,
-      check_required: 1,
-      unknown: 2,
-      ineligible: 3,
-    };
+    // Handle differently based on mode
+    let recommendedPrograms;
 
-    const recommendedPrograms = programsWithEligibility
-      .filter(p => p.eligibility.overall !== "ineligible")
-      .sort((a, b) => {
-        // Sort by eligibility status first
-        const eligDiff = eligibilityOrder[a.eligibility.overall] - eligibilityOrder[b.eligibility.overall];
-        if (eligDiff !== 0) return eligDiff;
-
-        // Then by deadline (sooner first)
-        const aDeadline = a.program.applicationDeadline?.getTime() || Infinity;
-        const bDeadline = b.program.applicationDeadline?.getTime() || Infinity;
-        return aDeadline - bDeadline;
-      })
-      .slice(0, limit)
-      .map(({ program, eligibility }) => ({
+    if (programNames) {
+      // LLM mode: keep all programs in order provided, don't filter
+      recommendedPrograms = programsWithEligibility.map(({ program, eligibility }) => ({
         id: program.id,
         name: program.name,
         shortName: program.shortName,
@@ -134,10 +157,53 @@ export async function GET(request: Request) {
           summary: eligibility.summary,
         },
       }));
+    } else {
+      // Discovery mode: filter and sort by eligibility
+      const eligibilityOrder: Record<EligibilityStatus, number> = {
+        eligible: 0,
+        check_required: 1,
+        unknown: 2,
+        ineligible: 3,
+      };
+
+      recommendedPrograms = programsWithEligibility
+        .filter(p => p.eligibility.overall !== "ineligible")
+        .sort((a, b) => {
+          // Sort by eligibility status first
+          const eligDiff = eligibilityOrder[a.eligibility.overall] - eligibilityOrder[b.eligibility.overall];
+          if (eligDiff !== 0) return eligDiff;
+
+          // Then by deadline (sooner first)
+          const aDeadline = a.program.applicationDeadline?.getTime() || Infinity;
+          const bDeadline = b.program.applicationDeadline?.getTime() || Infinity;
+          return aDeadline - bDeadline;
+        })
+        .slice(0, limit)
+        .map(({ program, eligibility }) => ({
+          id: program.id,
+          name: program.name,
+          shortName: program.shortName,
+          organization: program.organization,
+          description: program.description,
+          location: program.location,
+          duration: program.duration,
+          focusAreas: program.focusAreas,
+          selectivity: program.selectivity,
+          cost: program.cost,
+          stipend: program.stipend,
+          applicationDeadline: program.applicationDeadline,
+          websiteUrl: program.websiteUrl,
+          eligibility: {
+            status: eligibility.overall,
+            summary: eligibility.summary,
+          },
+        }));
+    }
 
     return NextResponse.json({
       programs: recommendedPrograms,
       totalFound: programsWithEligibility.filter(p => p.eligibility.overall !== "ineligible").length,
+      mode: programNames ? "llm" : "discovery",
     });
   } catch (error) {
     console.error("Error fetching program recommendations:", error);

@@ -13,7 +13,14 @@ export {
 } from "./providers";
 
 // Tools
-export { allTools, profileTools, planningTools } from "./tools";
+export {
+  allTools,
+  profileTools,
+  planningTools,
+  recommendationTools,
+  getWidgetTypeFromToolName,
+  isRecommendationTool,
+} from "./tools";
 export { executeToolCall } from "./tool-handlers";
 
 // Parser (NEW - Kimi K2)

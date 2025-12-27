@@ -150,10 +150,38 @@ export const planningTools = {
     description: "Create a new goal for the student to work towards.",
     inputSchema: goalSchema,
   },
-  
+
   addSchoolToList: {
     description: "Add a college to the student's school list.",
     inputSchema: schoolSchema,
+  },
+};
+
+// =============================================================================
+// RECOMMENDATION TOOLS
+// =============================================================================
+
+// School recommendations schema
+const schoolRecommendationsSchema = z.object({
+  schools: z.array(z.string()).describe("List of specific school names to recommend (e.g., ['MIT', 'Stanford', 'Carnegie Mellon'])"),
+  reason: z.string().optional().describe("Brief explanation of why these schools are a good fit"),
+});
+
+// Program recommendations schema
+const programRecommendationsSchema = z.object({
+  programs: z.array(z.string()).describe("List of specific program names to recommend (e.g., ['RSI', 'MITES', 'Stanford SIMR'])"),
+  reason: z.string().optional().describe("Brief explanation of why these programs are relevant"),
+});
+
+export const recommendationTools = {
+  showSchoolRecommendations: {
+    description: "Show a carousel of recommended colleges/universities. Call this when the student asks about what schools to apply to, wants school suggestions, or when you want to proactively suggest schools based on their profile and interests. Provide specific school names that match their profile.",
+    inputSchema: schoolRecommendationsSchema,
+  },
+
+  showProgramRecommendations: {
+    description: "Show a carousel of recommended summer programs, research opportunities, or internships. Call this when the student asks about programs to apply to, wants suggestions for summer activities, or when you want to proactively suggest programs. Provide specific program names.",
+    inputSchema: programRecommendationsSchema,
   },
 };
 
@@ -164,6 +192,7 @@ export const planningTools = {
 export const allTools = {
   ...profileTools,
   ...planningTools,
+  ...recommendationTools,
 };
 
 // Type for tool names
@@ -172,16 +201,23 @@ export type ToolName = keyof typeof allTools;
 // Helper to get widget type from tool name
 export function getWidgetTypeFromToolName(toolName: string): string | null {
   const mapping: Record<string, string> = {
-    saveGpa: "gpa",
+    saveGpa: "transcript",          // GPA mention triggers transcript upload
     saveTestScores: "sat",
     addActivity: "activity",
     addAward: "award",
-    addCourse: "course",
+    addCourse: "transcript",        // Course mention triggers transcript upload
     addProgram: "program",
     saveProfileInfo: "profile",
     addGoal: "goal",
     addSchoolToList: "school",
+    showSchoolRecommendations: "school_recommendations",
+    showProgramRecommendations: "program_recommendations",
   };
-  
+
   return mapping[toolName] || null;
+}
+
+// Check if a tool is a recommendation tool (requires special handling)
+export function isRecommendationTool(toolName: string): boolean {
+  return toolName === "showSchoolRecommendations" || toolName === "showProgramRecommendations";
 }

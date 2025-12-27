@@ -41,6 +41,9 @@ const icons: Record<WidgetType, React.ElementType> = {
   goal: Target,
   school: School,
   profile: User,
+  // Recommendation widgets use RecommendationCarousel, not this component
+  program_recommendations: FlaskConical,
+  school_recommendations: School,
 };
 
 const titles: Record<WidgetType, string> = {
@@ -53,6 +56,9 @@ const titles: Record<WidgetType, string> = {
   goal: "Goal",
   school: "School",
   profile: "Profile Info",
+  // Recommendation widgets use RecommendationCarousel, not this component
+  program_recommendations: "Recommended Programs",
+  school_recommendations: "Recommended Schools",
 };
 
 export function ConfirmationWidget({ type, data, onConfirm, onDismiss }: ConfirmationWidgetProps) {

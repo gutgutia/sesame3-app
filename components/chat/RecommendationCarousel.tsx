@@ -69,6 +69,11 @@ interface SchoolRecommendation {
 interface RecommendationCarouselProps {
   type: "program_recommendations" | "school_recommendations";
   data?: {
+    // LLM-provided names (from tool calls)
+    schools?: string[];
+    programs?: string[];
+    reason?: string;
+    // Discovery mode params
     focusArea?: string;
     tier?: string;
   };
@@ -101,9 +106,32 @@ export function RecommendationCarousel({
       setError(null);
 
       try {
-        const endpoint = isPrograms
-          ? `/api/recommendations/programs${data?.focusArea ? `?focus=${data.focusArea}` : ""}`
-          : `/api/recommendations/schools${data?.tier ? `?tier=${data.tier}` : ""}`;
+        // Build query params based on available data
+        let endpoint: string;
+
+        if (isPrograms) {
+          const params = new URLSearchParams();
+          // LLM mode: use program names
+          if (data?.programs && data.programs.length > 0) {
+            params.set("programs", data.programs.join(","));
+          }
+          // Discovery mode: filter by focus area
+          if (data?.focusArea) {
+            params.set("focus", data.focusArea);
+          }
+          endpoint = `/api/recommendations/programs${params.toString() ? `?${params}` : ""}`;
+        } else {
+          const params = new URLSearchParams();
+          // LLM mode: use school names
+          if (data?.schools && data.schools.length > 0) {
+            params.set("schools", data.schools.join(","));
+          }
+          // Discovery mode: filter by tier
+          if (data?.tier) {
+            params.set("tier", data.tier);
+          }
+          endpoint = `/api/recommendations/schools${params.toString() ? `?${params}` : ""}`;
+        }
 
         const response = await fetch(endpoint);
         if (!response.ok) throw new Error("Failed to fetch");
@@ -273,7 +301,13 @@ function ProgramCard({
   const deadlineDate = program.applicationDeadline
     ? new Date(program.applicationDeadline)
     : null;
-  const isDeadlineSoon = deadlineDate && deadlineDate.getTime() - Date.now() < 30 * 24 * 60 * 60 * 1000;
+
+  // Check if deadline is within 30 days (calculated once on mount)
+  const [isDeadlineSoon] = useState(() => {
+    if (!deadlineDate) return false;
+    const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    return deadlineDate.getTime() - Date.now() < thirtyDaysMs;
+  });
 
   return (
     <div
