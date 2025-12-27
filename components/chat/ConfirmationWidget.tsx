@@ -600,6 +600,17 @@ function ProfileFields({ data, onChange }: { data: Record<string, unknown>; onCh
 // TRANSCRIPT UPLOAD WIDGET - Replaces course widget
 // =============================================================================
 
+// Types for extracted course data
+interface ExtractedCourse {
+  name: string;
+  subject?: string;
+  level?: string;
+  gradeLevel?: string;
+  grade?: string;
+  credits?: number;
+  selected?: boolean;  // For user selection in review
+}
+
 function TranscriptUploadWidget({
   onConfirm,
   onDismiss
@@ -610,6 +621,9 @@ function TranscriptUploadWidget({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Review state - shows extracted courses for confirmation
+  const [extractedCourses, setExtractedCourses] = useState<ExtractedCourse[] | null>(null);
+  const [extractedGpa, setExtractedGpa] = useState<{ weighted?: number; unweighted?: number } | null>(null);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -660,12 +674,12 @@ function TranscriptUploadWidget({
       }
 
       const result = await response.json();
-      // Signal success with extracted courses
-      onConfirm({
-        type: "transcript_extracted",
-        courses: result.courses,
-        count: result.courses.length,
-      });
+      // Show review screen instead of immediately confirming
+      const coursesWithSelection = result.courses.map((c: ExtractedCourse) => ({ ...c, selected: true }));
+      setExtractedCourses(coursesWithSelection);
+      if (result.gpaUnweighted || result.gpaWeighted) {
+        setExtractedGpa({ unweighted: result.gpaUnweighted, weighted: result.gpaWeighted });
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to process transcript");
     } finally {
@@ -673,6 +687,146 @@ function TranscriptUploadWidget({
     }
   };
 
+  const toggleCourse = (index: number) => {
+    if (!extractedCourses) return;
+    setExtractedCourses(prev =>
+      prev?.map((c, i) => i === index ? { ...c, selected: !c.selected } : c) || null
+    );
+  };
+
+  const updateCourseLevel = (index: number, level: string) => {
+    if (!extractedCourses) return;
+    setExtractedCourses(prev =>
+      prev?.map((c, i) => i === index ? { ...c, level } : c) || null
+    );
+  };
+
+  const handleConfirmCourses = () => {
+    if (!extractedCourses) return;
+    const selectedCourses = extractedCourses.filter(c => c.selected);
+    onConfirm({
+      type: "transcript_extracted",
+      courses: selectedCourses,
+      count: selectedCourses.length,
+    });
+  };
+
+  const handleBackToUpload = () => {
+    setExtractedCourses(null);
+    setExtractedGpa(null);
+    setError(null);
+  };
+
+  // Review screen - show extracted courses for confirmation
+  if (extractedCourses) {
+    const selectedCount = extractedCourses.filter(c => c.selected).length;
+
+    return (
+      <div className="bg-accent-surface/50 border border-accent-border rounded-xl p-4 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-lg">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-3">
+          <div className="flex items-center gap-2">
+            <Upload className="w-5 h-5 text-accent-primary" />
+            <span className="text-sm font-bold text-accent-primary uppercase tracking-wider">
+              Review Courses
+            </span>
+          </div>
+          <button
+            onClick={onDismiss}
+            className="p-1 hover:bg-white rounded transition-colors text-text-muted"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Summary */}
+        <div className="bg-white rounded-lg p-3 mb-3 border border-border-subtle">
+          <p className="text-sm text-text-main">
+            Found <strong>{extractedCourses.length}</strong> courses
+            {extractedGpa?.unweighted && (
+              <span className="ml-2 text-text-muted">
+                • GPA: {extractedGpa.unweighted.toFixed(2)}
+                {extractedGpa.weighted && ` / ${extractedGpa.weighted.toFixed(2)} W`}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            Uncheck any courses you don&apos;t want to add. You can also change the course level.
+          </p>
+        </div>
+
+        {/* Course List */}
+        <div className="max-h-64 overflow-y-auto space-y-2 mb-3">
+          {extractedCourses.map((course, index) => (
+            <div
+              key={index}
+              className={cn(
+                "bg-white rounded-lg p-3 border transition-all",
+                course.selected ? "border-accent-primary/50" : "border-border-subtle opacity-60"
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={course.selected}
+                  onChange={() => toggleCourse(index)}
+                  className="mt-1 rounded border-border-medium"
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-medium text-sm text-text-main truncate">
+                      {course.name}
+                    </span>
+                    {course.grade && (
+                      <span className="text-xs px-1.5 py-0.5 bg-green-50 text-green-600 rounded">
+                        {course.grade}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <select
+                      value={course.level || "regular"}
+                      onChange={(e) => updateCourseLevel(index, e.target.value)}
+                      className="text-xs bg-bg-sidebar border border-border-medium rounded px-2 py-1"
+                    >
+                      <option value="regular">Regular</option>
+                      <option value="honors">Honors</option>
+                      <option value="ap">AP</option>
+                      <option value="ib">IB</option>
+                      <option value="dual_enrollment">Dual Enrollment</option>
+                    </select>
+                    {course.gradeLevel && (
+                      <span className="text-xs text-text-muted">{course.gradeLevel}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2 pt-3 border-t border-border-subtle">
+          <button
+            onClick={handleBackToUpload}
+            className="px-4 py-2.5 bg-white border border-border-medium rounded-lg text-sm font-medium text-text-muted hover:text-text-main transition-colors"
+          >
+            Re-upload
+          </button>
+          <button
+            onClick={handleConfirmCourses}
+            disabled={selectedCount === 0}
+            className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Check className="w-4 h-4" />
+            Save {selectedCount} Course{selectedCount !== 1 ? "s" : ""}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Upload screen
   return (
     <div className="bg-accent-surface/50 border border-accent-border rounded-xl p-4 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-md">
       {/* Header */}
