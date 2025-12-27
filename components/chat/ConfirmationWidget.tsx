@@ -749,7 +749,7 @@ function TranscriptUploadWidget({
 }
 
 // =============================================================================
-// SCHOOL CONFIRM WIDGET - Pre-filled from database lookup, just pick tier
+// SCHOOL CONFIRM WIDGET - Handles both known and unknown schools
 // =============================================================================
 
 function SchoolConfirmWidget({
@@ -763,6 +763,9 @@ function SchoolConfirmWidget({
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
+
   const schoolName = (data.name as string) || (data.schoolName as string) || "Unknown School";
   const schoolId = data.schoolId as string;
   const location = data.location as string;
@@ -770,6 +773,60 @@ function SchoolConfirmWidget({
   // Can submit if we have tier AND either schoolId or a real school name from data
   const hasSchoolIdentifier = !!schoolId || !!(data.name || data.schoolName);
   const canSubmit = !!data.tier && hasSchoolIdentifier;
+
+  // If no schoolId, this is an unknown school - show request flow
+  const isUnknownSchool = !schoolId;
+
+  const handleRequestSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/data-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "school",
+          name: schoolName,
+          details: {
+            tier: data.tier,
+            location: location,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        setRequestSubmitted(true);
+        // Also save to user's school list (will create school if needed)
+        onConfirm();
+      } else {
+        console.error("Failed to submit request");
+      }
+    } catch (error) {
+      console.error("Error submitting request:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Show success state after request submitted
+  if (requestSubmitted) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <Check className="w-5 h-5 text-green-600" />
+          <span className="text-sm font-bold text-green-700">Request Sent!</span>
+        </div>
+        <p className="text-sm text-green-700 mb-3">
+          We&apos;ll add <strong>{schoolName}</strong> to our database soon. It&apos;s been added to your school list in the meantime.
+        </p>
+        <button
+          onClick={onDismiss}
+          className="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+        >
+          Got it
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-accent-surface/50 border border-accent-border rounded-xl p-4 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-sm">
@@ -795,7 +852,19 @@ function SchoolConfirmWidget({
         {location && (
           <div className="text-xs text-text-muted mt-0.5">{location}</div>
         )}
+        {isUnknownSchool && (
+          <span className="inline-block mt-2 text-[10px] px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full">
+            Not in database
+          </span>
+        )}
       </div>
+
+      {/* Unknown school message */}
+      {isUnknownSchool && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-xs text-amber-700">
+          We don&apos;t have this school in our database yet. We&apos;ll add it to your list and send a request to add it with full admission data.
+        </div>
+      )}
 
       {/* Tier Selection */}
       <div className="mb-4">
@@ -825,14 +894,29 @@ function SchoolConfirmWidget({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <button
-          onClick={onConfirm}
-          disabled={!canSubmit}
-          className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          <Check className="w-4 h-4" />
-          Add to List
-        </button>
+        {isUnknownSchool ? (
+          <button
+            onClick={handleRequestSubmit}
+            disabled={!canSubmit || isSubmitting}
+            className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            Add & Request
+          </button>
+        ) : (
+          <button
+            onClick={onConfirm}
+            disabled={!canSubmit}
+            className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Check className="w-4 h-4" />
+            Add to List
+          </button>
+        )}
         <button
           onClick={onDismiss}
           className="px-4 py-2.5 bg-white border border-border-medium rounded-lg text-sm font-medium text-text-muted hover:text-text-main transition-colors"
@@ -845,7 +929,7 @@ function SchoolConfirmWidget({
 }
 
 // =============================================================================
-// PROGRAM CONFIRM WIDGET - Pre-filled from database lookup
+// PROGRAM CONFIRM WIDGET - Handles both known and unknown programs
 // =============================================================================
 
 function ProgramConfirmWidget({
@@ -859,11 +943,69 @@ function ProgramConfirmWidget({
   onConfirm: () => void;
   onDismiss: () => void;
 }) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [requestSubmitted, setRequestSubmitted] = useState(false);
+
   const programName = (data.name as string) || "Unknown Program";
   const organization = data.organization as string;
   const programId = data.programId as string;
   const type = data.type as string;
   const selectivity = data.selectivity as string;
+
+  // If no programId, this is an unknown program - show request flow
+  const isUnknownProgram = !programId;
+
+  const handleRequestSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      const response = await fetch("/api/data-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "program",
+          name: programName,
+          organization: organization,
+          details: {
+            year: data.year,
+            userStatus: data.status,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        setRequestSubmitted(true);
+        // Also save to user's profile as a custom program
+        onConfirm();
+      } else {
+        console.error("Failed to submit request");
+      }
+    } catch (error) {
+      console.error("Error submitting request:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Show success state after request submitted
+  if (requestSubmitted) {
+    return (
+      <div className="bg-green-50 border border-green-200 rounded-xl p-4 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-sm">
+        <div className="flex items-center gap-2 mb-2">
+          <Check className="w-5 h-5 text-green-600" />
+          <span className="text-sm font-bold text-green-700">Request Sent!</span>
+        </div>
+        <p className="text-sm text-green-700 mb-3">
+          We&apos;ll add <strong>{programName}</strong> to our database soon. It&apos;s been added to your profile in the meantime.
+        </p>
+        <button
+          onClick={onDismiss}
+          className="w-full bg-green-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+        >
+          Got it
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-accent-surface/50 border border-accent-border rounded-xl p-4 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-sm">
@@ -872,7 +1014,7 @@ function ProgramConfirmWidget({
         <div className="flex items-center gap-2">
           <FlaskConical className="w-5 h-5 text-accent-primary" />
           <span className="text-sm font-bold text-accent-primary uppercase tracking-wider">
-            Add Program
+            {isUnknownProgram ? "Add Program" : "Add Program"}
           </span>
         </div>
         <button
@@ -900,8 +1042,20 @@ function ProgramConfirmWidget({
               {selectivity}
             </span>
           )}
+          {isUnknownProgram && (
+            <span className="text-[10px] px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full">
+              Not in database
+            </span>
+          )}
         </div>
       </div>
+
+      {/* Unknown program message */}
+      {isUnknownProgram && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-xs text-amber-700">
+          We don&apos;t have this program in our database yet. We&apos;ll add it to your profile and send a request to add it to our curated list.
+        </div>
+      )}
 
       {/* Status Selection */}
       <div className="mb-4">
@@ -924,14 +1078,29 @@ function ProgramConfirmWidget({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <button
-          onClick={onConfirm}
-          disabled={!data.status}
-          className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-        >
-          <Check className="w-4 h-4" />
-          Add to List
-        </button>
+        {isUnknownProgram ? (
+          <button
+            onClick={handleRequestSubmit}
+            disabled={!data.status || isSubmitting}
+            className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Check className="w-4 h-4" />
+            )}
+            Add & Request
+          </button>
+        ) : (
+          <button
+            onClick={onConfirm}
+            disabled={!data.status}
+            className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            <Check className="w-4 h-4" />
+            Add to List
+          </button>
+        )}
         <button
           onClick={onDismiss}
           className="px-4 py-2.5 bg-white border border-border-medium rounded-lg text-sm font-medium text-text-muted hover:text-text-main transition-colors"

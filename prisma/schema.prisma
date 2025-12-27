@@ -134,7 +134,8 @@ model StudentProfile {
   // Relations - AI
   conversations   Conversation[]
   studentContext  StudentContext?
-  
+  dataRequests    DataRequest[]
+
   // Relations - Access Control
   accessGrants AccessGrant[]
   invitations  Invitation[]
@@ -1294,6 +1295,45 @@ model GlobalConfig {
   // Maintenance mode
   maintenanceMode     Boolean @default(false)
   maintenanceMessage  String?
-  
+
   updatedAt DateTime @updatedAt
+}
+
+// -----------------------------------------------------------------------------
+// DataRequest - Requests for adding new programs/schools to the database
+// Students can request items not in our curated database
+// -----------------------------------------------------------------------------
+
+model DataRequest {
+  id               String   @id @default(uuid())
+
+  // Who requested
+  studentProfileId String
+  studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+
+  // What type of data
+  type             String   // "program" | "school"
+
+  // The name/details they provided
+  name             String
+  organization     String?  // For programs (e.g., "UCSB" for "UCSB SRA")
+  details          Json?    // Additional info (year, type, url, etc.)
+
+  // Request status
+  status           String   @default("pending")  // "pending" | "approved" | "rejected" | "duplicate"
+
+  // Admin response
+  adminNotes       String?
+  resolvedAt       DateTime?
+  resolvedById     String?
+
+  // If approved, link to created record
+  createdRecordId  String?  // ID of the SummerProgram or School created
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([type])
+  @@index([status])
+  @@index([studentProfileId])
 }
