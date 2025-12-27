@@ -767,6 +767,10 @@ function SchoolConfirmWidget({
   const schoolId = data.schoolId as string;
   const location = data.location as string;
 
+  // Can submit if we have tier AND either schoolId or a real school name from data
+  const hasSchoolIdentifier = !!schoolId || !!(data.name || data.schoolName);
+  const canSubmit = !!data.tier && hasSchoolIdentifier;
+
   return (
     <div className="bg-accent-surface/50 border border-accent-border rounded-xl p-4 mt-3 animate-in fade-in slide-in-from-bottom-2 duration-300 w-full max-w-sm">
       {/* Header */}
@@ -823,7 +827,7 @@ function SchoolConfirmWidget({
       <div className="flex gap-2">
         <button
           onClick={onConfirm}
-          disabled={!data.tier || !schoolId}
+          disabled={!canSubmit}
           className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Check className="w-4 h-4" />
