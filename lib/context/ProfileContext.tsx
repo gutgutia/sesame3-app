@@ -174,6 +174,8 @@ interface ProfileContextType {
   addTask: (goalId: string, task: NonNullable<NonNullable<ProfileData["goals"]>[number]["tasks"]>[number]) => void;
   addSubtask: (goalId: string, parentTaskId: string, subtask: NonNullable<NonNullable<NonNullable<ProfileData["goals"]>[number]["tasks"]>[number]["subtasks"]>[number]) => void;
   addGoal: (goal: NonNullable<ProfileData["goals"]>[number]) => void;
+  addSchool: (school: NonNullable<ProfileData["schoolList"]>[number]) => void;
+  addProgram: (program: NonNullable<ProfileData["programs"]>[number]) => void;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
@@ -374,6 +376,22 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setProfile(prev => prev ? { ...prev, goals: [...(prev.goals || []), goal] } : null);
   }, []);
 
+  // Optimistic add school
+  const addSchool = useCallback((school: NonNullable<ProfileData["schoolList"]>[number]) => {
+    setProfile(prev => {
+      if (!prev) return null;
+      // Check if school already exists (by school.id)
+      const exists = prev.schoolList?.some(s => s.school?.id === school.school?.id);
+      if (exists) return prev;
+      return { ...prev, schoolList: [...(prev.schoolList || []), school] };
+    });
+  }, []);
+
+  // Optimistic add program
+  const addProgram = useCallback((program: NonNullable<ProfileData["programs"]>[number]) => {
+    setProfile(prev => prev ? { ...prev, programs: [...(prev.programs || []), program] } : null);
+  }, []);
+
   return (
     <ProfileContext.Provider
       value={{
@@ -387,6 +405,8 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         addTask,
         addSubtask,
         addGoal,
+        addSchool,
+        addProgram,
       }}
     >
       {children}

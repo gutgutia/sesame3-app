@@ -6,6 +6,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { ConfirmationWidget, WidgetType } from "./ConfirmationWidget";
 import { RecommendationCarousel } from "./RecommendationCarousel";
+import { useProfile } from "@/lib/context/ProfileContext";
 
 // Message type
 type Message = {
@@ -49,6 +50,9 @@ export function ChatInterface({
   const hasInitialized = useRef(false);
   const welcomeSet = useRef(false);
   const conversationLoaded = useRef(false);
+
+  // Get optimistic update functions from profile context
+  const { addSchool, addProgram, refreshProfile } = useProfile();
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -349,6 +353,51 @@ export function ChatInterface({
       }
       const method = getApiMethod(widget.type);
 
+      // Apply optimistic update BEFORE API call for instant UI feedback
+      if (widget.type === "school") {
+        const optimisticSchool = {
+          id: `temp-${Date.now()}`,
+          tier: (data.tier as string) || "reach",
+          isDream: data.tier === "dream",
+          status: null,
+          interestLevel: null,
+          school: {
+            id: (data.schoolId as string) || `temp-school-${Date.now()}`,
+            name: (data.name as string) || (data.schoolName as string) || "Unknown School",
+            shortName: null,
+            city: null,
+            state: null,
+            acceptanceRate: null,
+            satRange25: null,
+            satRange75: null,
+            websiteUrl: null,
+          },
+        };
+        addSchool(optimisticSchool);
+      } else if (widget.type === "program") {
+        const optimisticProgram = {
+          id: `temp-${Date.now()}`,
+          name: (data.name as string) || "Unknown Program",
+          organization: data.organization as string | null,
+          type: data.type as string | null,
+          status: (data.status as string) || "interested",
+          year: data.year as number | null,
+          selectivity: data.selectivity as string | null,
+          description: data.description as string | null,
+          url: data.url as string | null,
+          startDate: data.startDate as string | null,
+          endDate: data.endDate as string | null,
+          duration: data.duration as string | null,
+        };
+        addProgram(optimisticProgram);
+      }
+
+      // Mark as confirmed immediately (optimistic)
+      setPendingWidgets(prev =>
+        prev.map(w => w.id === widgetId ? { ...w, status: "confirmed" as const } : w)
+      );
+
+      // Call API in background
       const response = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -356,12 +405,12 @@ export function ChatInterface({
       });
 
       if (response.ok) {
-        setPendingWidgets(prev =>
-          prev.map(w => w.id === widgetId ? { ...w, status: "confirmed" as const } : w)
-        );
+        // Refresh profile to get server-generated IDs and any other updates
+        refreshProfile();
         onProfileUpdate?.();
       } else {
         console.error("Failed to save:", await response.text());
+        // TODO: Could revert optimistic update here if needed
       }
     } catch (error) {
       console.error("Failed to save data:", error);

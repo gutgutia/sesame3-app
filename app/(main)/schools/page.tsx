@@ -47,9 +47,9 @@ interface StudentSchool {
 // =============================================================================
 
 export default function SchoolsPage() {
-  const { profile, isLoading, refreshProfile } = useProfile();
+  const { profile, isLoading, isFullyLoaded, refreshProfile } = useProfile();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  
+
   // Extract schools from profile
   const schools: StudentSchool[] = (profile?.schoolList || []).map(s => ({
     id: s.id,
@@ -74,7 +74,9 @@ export default function SchoolsPage() {
     dreamSchools: schools.filter(s => s.isDream),
   }), [schools]);
 
-  if (isLoading) {
+  // Show loading if initial load OR if empty schools and profile not fully loaded yet
+  // (handles the progressive loading case where summary loads first without schoolList)
+  if (isLoading || (schools.length === 0 && !isFullyLoaded)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
