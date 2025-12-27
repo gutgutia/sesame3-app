@@ -220,9 +220,15 @@ export function ChatInterface({
         
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
-        
+
+        // Debug: log first chunk to see what we're receiving
+        if (buffer.length < 500) {
+          console.log("[Chat] Buffer (first chunk):", JSON.stringify(buffer.slice(0, 200)));
+        }
+
         // Check for SSE widget event at start of stream
         if (buffer.includes("event: widget")) {
+          console.log("[Chat] Found widget event in buffer");
           const eventMatch = buffer.match(/event: widget\ndata: (.+?)(\n\n|$)/);
           if (eventMatch) {
             try {

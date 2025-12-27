@@ -152,13 +152,16 @@ export async function POST(request: NextRequest) {
       async start(controller) {
         try {
           // Send widget data first (if detected AND widgets are enabled)
-          // Note: Widgets are disabled for v1 - architecture is in place for future
           if (featureFlags.enableWidgets && parserResult?.widget) {
             const widgetEvent = JSON.stringify({
               type: "widget",
               widget: parserResult.widget,
             });
-            controller.enqueue(encoder.encode(`event: widget\ndata: ${widgetEvent}\n\n`));
+            const sseMessage = `event: widget\ndata: ${widgetEvent}\n\n`;
+            console.log("[Chat] Sending widget SSE:", sseMessage.slice(0, 150));
+            controller.enqueue(encoder.encode(sseMessage));
+          } else if (parserResult?.widget) {
+            console.log("[Chat] Widget detected but enableWidgets flag is:", featureFlags.enableWidgets);
           }
           
           // Stream the Advisor response
