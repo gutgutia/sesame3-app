@@ -571,18 +571,62 @@ model School {
   // Links
   websiteUrl         String?
   admissionsUrl      String?
-  
+  website            String?   // Primary website URL
+
   // Metadata
   lastUpdated        DateTime  @default(now())
   dataSource         String?   // "college_scorecard" | "manual" | "common_data_set"
+  dataStatus         String?   // "pending_review" | "verified" | "needs_update"
   
   // Relations
   studentSchools StudentSchool[]
   goals          Goal[]
   tasks          Task[]
   taskTemplates  TaskTemplate[]
+  deadlineYears  SchoolDeadlineYear[]
 
   @@index([name])
+}
+
+// -----------------------------------------------------------------------------
+// SchoolDeadlineYear - Year-specific deadline data for schools
+// Deadlines change every year. This table stores historical and current deadlines.
+// -----------------------------------------------------------------------------
+
+model SchoolDeadlineYear {
+  id              String @id @default(uuid())
+  schoolId        String
+  school          School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // Admissions cycle (e.g., 2025 means Fall 2025 enrollment, applying in 2024-2025)
+  admissionsCycle Int
+
+  // Application Deadlines
+  deadlineEd           DateTime?  // Early Decision
+  deadlineEd2          DateTime?  // ED2
+  deadlineEa           DateTime?  // Early Action
+  deadlineRea          DateTime?  // Restrictive EA
+  deadlineRd           DateTime?  // Regular Decision
+  deadlineFinancialAid DateTime?  // CSS Profile / FAFSA priority deadline
+  deadlineCommitment   DateTime?  // Enrollment commitment (usually May 1)
+
+  // Notification Dates
+  notificationEd       DateTime?  // ED notification
+  notificationEa       DateTime?  // EA notification
+  notificationRd       DateTime?  // RD notification
+
+  // Data Quality
+  dataSource      String?   // "website" | "common_data_set" | "llm_scraped" | "manual"
+  dataConfidence  String?   // "high" | "medium" | "low"
+  sourceUrl       String?   // Where the data was found
+  lastVerified    DateTime? // When admin last verified this data
+  verifiedById    String?   // Admin who verified
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([schoolId, admissionsCycle])
+  @@index([admissionsCycle])
 }
 
 // -----------------------------------------------------------------------------
@@ -693,6 +737,9 @@ model SummerProgram {
   isActive      Boolean   @default(true)   // Is this program still running?
   lastVerified  DateTime?                  // When we last verified the info
   dataSource    String?                    // "manual" | "website" | "student_report"
+  dataStatus    String?                    // "pending_review" | "verified" | "needs_update"
+  category      String?                    // "STEM" | "research" | "arts" | "leadership" | "business" | "humanities"
+  focus         String?                    // Primary focus area for display
   internalNotes String?                    // Admin notes
 
   createdAt     DateTime  @default(now())
