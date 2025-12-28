@@ -128,6 +128,7 @@ export async function GET(request: NextRequest) {
       ...tasks.map(task => ({
         id: task.id,
         type: "task" as const,
+        taskType: (task.type || "action") as "milestone" | "action",
         title: task.title,
         description: task.description,
         dueDate: task.dueDate,
@@ -147,6 +148,7 @@ export async function GET(request: NextRequest) {
       ...goals.map(goal => ({
         id: goal.id,
         type: "goal" as const,
+        taskType: "milestone" as const,  // Goals are milestones (target dates)
         title: goal.title,
         description: null,
         dueDate: goal.targetDate,

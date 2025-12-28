@@ -13,6 +13,8 @@ import {
   ChevronDown,
   ChevronRight,
   Filter,
+  Flag,
+  Bell,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +25,7 @@ import { cn } from "@/lib/utils";
 interface TimelineItem {
   id: string;
   type: "task" | "goal";
+  taskType: "milestone" | "action";  // milestone = informational, action = completable
   title: string;
   description: string | null;
   dueDate: string | null;
@@ -343,6 +346,7 @@ function TimelineItemRow({
   isOverdue: boolean;
 }) {
   const isCompleted = item.status === "completed";
+  const isMilestone = item.taskType === "milestone";
 
   const getSourceIcon = () => {
     switch (item.sourceType) {
@@ -374,15 +378,33 @@ function TimelineItemRow({
     });
   };
 
+  // Get milestone icon based on deadline type
+  const getMilestoneIcon = () => {
+    if (item.deadlineType?.includes("notification")) {
+      return <Bell className="w-3 h-3 text-blue-500" />;
+    }
+    if (item.deadlineType?.includes("program_start") || item.deadlineType?.includes("program_end")) {
+      return <Calendar className="w-3 h-3 text-green-500" />;
+    }
+    return <Flag className="w-3 h-3 text-amber-500" />;
+  };
+
   return (
     <div
       className={cn(
         "flex items-center gap-4 px-4 py-3 hover:bg-bg-sidebar/50 transition-colors",
-        isCompleted && "opacity-60"
+        isCompleted && "opacity-60",
+        isMilestone && "bg-gradient-to-r from-blue-50/50 to-transparent"
       )}
     >
-      {/* Checkbox */}
-      {item.type === "task" && (
+      {/* Icon - Checkbox for actions, Flag/Calendar for milestones */}
+      {isMilestone ? (
+        // Milestone indicator (no checkbox)
+        <div className="w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+          {getMilestoneIcon()}
+        </div>
+      ) : item.type === "task" ? (
+        // Action checkbox
         <button
           onClick={onToggle}
           className={cn(
@@ -394,8 +416,8 @@ function TimelineItemRow({
         >
           {isCompleted && <Check className="w-3 h-3" />}
         </button>
-      )}
-      {item.type === "goal" && (
+      ) : (
+        // Goal indicator
         <div className="w-5 h-5 rounded-full bg-accent-surface flex items-center justify-center shrink-0">
           <Target className="w-3 h-3 text-accent-primary" />
         </div>
@@ -408,12 +430,18 @@ function TimelineItemRow({
             className={cn(
               "font-medium truncate",
               isCompleted && "line-through text-text-muted",
-              isOverdue && !isCompleted && "text-red-700"
+              isOverdue && !isCompleted && !isMilestone && "text-red-700",
+              isMilestone && "text-blue-700"
             )}
           >
             {item.title}
           </span>
-          {item.isHardDeadline && !isCompleted && (
+          {isMilestone && (
+            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-medium">
+              Info
+            </span>
+          )}
+          {!isMilestone && item.isHardDeadline && !isCompleted && (
             <span className="px-1.5 py-0.5 bg-red-100 text-red-700 text-xs rounded font-medium">
               Hard
             </span>

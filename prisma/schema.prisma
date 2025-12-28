@@ -580,6 +580,7 @@ model School {
   studentSchools StudentSchool[]
   goals          Goal[]
   tasks          Task[]
+  taskTemplates  TaskTemplate[]
 
   @@index([name])
 }
@@ -701,6 +702,7 @@ model SummerProgram {
   studentPrograms StudentSummerProgram[]
   goals           Goal[]
   tasks           Task[]
+  taskTemplates   TaskTemplate[]
 
   @@unique([name, programYear])  // Same program can have multiple year entries
   @@index([programYear])
@@ -900,6 +902,9 @@ model Task {
   // Task Info
   title       String
   description String?
+  type        String    @default("action")   // "milestone" | "action"
+                                             // milestone = informational date marker (no checkbox)
+                                             // action = completable task
 
   // Status
   status      String    @default("pending")  // "pending" | "in_progress" | "completed" | "blocked"
@@ -949,6 +954,43 @@ model Task {
   @@index([schoolId])
   @@index([summerProgramId])
   @@index([dueDate])
+}
+
+// -----------------------------------------------------------------------------
+// TaskTemplate - Pre-defined tasks for schools/programs
+// -----------------------------------------------------------------------------
+// Templates are used to pre-populate tasks when a student adds a school/program
+// to their plan. They can be universal (apply to all) or specific to a program.
+
+model TaskTemplate {
+  id              String @id @default(uuid())
+
+  // What this template applies to (null = universal template for all applications)
+  schoolId        String?
+  school          School?        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  summerProgramId String?
+  summerProgram   SummerProgram? @relation(fields: [summerProgramId], references: [id], onDelete: Cascade)
+
+  // Template content
+  title           String
+  description     String?
+  type            String         @default("action")  // "milestone" | "action"
+  category        String?        // "research" | "materials" | "submission" | "notification"
+
+  // Timing - which deadline field to derive the date from, and offset
+  // e.g., deadlineField="deadlineApplication", daysOffset=-7 means "7 days before app deadline"
+  deadlineField   String?        // Field name on School/SummerProgram: "deadlineApplication", "deadlineEd", etc.
+  daysOffset      Int            @default(0)  // Days before (negative) or after (positive) the deadline
+
+  // Display
+  displayOrder    Int            @default(0)
+  isDefault       Boolean        @default(true)  // Show by default when importing
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([schoolId])
+  @@index([summerProgramId])
 }
 
 // =============================================================================

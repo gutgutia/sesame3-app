@@ -909,6 +909,7 @@ function TranscriptUploadWidget({
 interface SchoolDeadline {
   type: string;
   label: string;
+  taskType: "milestone" | "action";
   date: string | null;
   alreadyAdded: boolean;
 }
@@ -929,6 +930,8 @@ function SchoolConfirmWidget({
   const [isLoadingDeadlines, setIsLoadingDeadlines] = useState(false);
   const [availableDeadlines, setAvailableDeadlines] = useState<SchoolDeadline[]>([]);
   const [selectedDeadlines, setSelectedDeadlines] = useState<Set<string>>(new Set());
+  const [includeActions, setIncludeActions] = useState(true); // Include action templates by default
+  const [actionTemplates, setActionTemplates] = useState<Array<{ title: string; daysOffset: number; category: string }>>([]);
   const [createdTasks, setCreatedTasks] = useState<Array<{ title: string; dueDate: string | null }>>([]);
 
   const schoolName = (data.name as string) || (data.schoolName as string) || "Unknown School";
@@ -953,6 +956,7 @@ function SchoolConfirmWidget({
       if (response.ok) {
         const result = await response.json();
         setAvailableDeadlines(result.deadlines || []);
+        setActionTemplates(result.actionTemplates || []);
         // Pre-select application deadlines based on tier/application type
         const preSelected = new Set<string>();
         for (const d of result.deadlines) {
@@ -1013,14 +1017,19 @@ function SchoolConfirmWidget({
       onConfirm();
 
       // Then, import selected deadlines to plan
-      if (selectedDeadlines.size > 0 && schoolId) {
+      const deadlinesToImport = Array.from(selectedDeadlines);
+      if (includeActions) {
+        deadlinesToImport.push("include_actions");
+      }
+
+      if (deadlinesToImport.length > 0 && schoolId) {
         const response = await fetch("/api/plan/import-deadlines", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             type: "school",
             sourceId: schoolId,
-            deadlines: Array.from(selectedDeadlines),
+            deadlines: deadlinesToImport,
           }),
         });
 
@@ -1095,38 +1104,82 @@ function SchoolConfirmWidget({
           <div className="flex items-center justify-center py-6">
             <Loader2 className="w-6 h-6 text-accent-primary animate-spin" />
           </div>
-        ) : selectableDeadlines.length > 0 ? (
-          <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
-            {selectableDeadlines.map(deadline => (
-              <label
-                key={deadline.type}
-                className={cn(
-                  "flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all",
-                  selectedDeadlines.has(deadline.type)
-                    ? "border-accent-primary bg-accent-surface/50"
-                    : "border-border-subtle bg-white hover:border-accent-primary/50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedDeadlines.has(deadline.type)}
-                  onChange={() => toggleDeadline(deadline.type)}
-                  className="rounded border-border-medium"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-text-main">{deadline.label}</div>
-                  <div className="text-xs text-text-muted">
-                    {deadline.date ? new Date(deadline.date).toLocaleDateString("en-US", {
-                      month: "short", day: "numeric", year: "numeric"
-                    }) : "Date TBD"}
-                  </div>
-                </div>
-              </label>
-            ))}
-          </div>
         ) : (
-          <div className="text-center py-4 text-sm text-text-muted mb-4">
-            No deadline dates available for this school yet.
+          <div className="space-y-4 mb-4">
+            {/* Milestones/Deadlines */}
+            {selectableDeadlines.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+                  Milestones & Deadlines
+                </div>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {selectableDeadlines.map(deadline => (
+                    <label
+                      key={deadline.type}
+                      className={cn(
+                        "flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all",
+                        selectedDeadlines.has(deadline.type)
+                          ? "border-accent-primary bg-accent-surface/50"
+                          : "border-border-subtle bg-white hover:border-accent-primary/50"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDeadlines.has(deadline.type)}
+                        onChange={() => toggleDeadline(deadline.type)}
+                        className="rounded border-border-medium"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-text-main">{deadline.label}</span>
+                          {deadline.taskType === "milestone" && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Info</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          {deadline.date ? new Date(deadline.date).toLocaleDateString("en-US", {
+                            month: "short", day: "numeric", year: "numeric"
+                          }) : "Date TBD"}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Tasks Toggle */}
+            {actionTemplates.length > 0 && (
+              <div>
+                <label
+                  className={cn(
+                    "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                    includeActions
+                      ? "border-green-500 bg-green-50/50"
+                      : "border-border-subtle bg-white hover:border-green-300"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeActions}
+                    onChange={(e) => setIncludeActions(e.target.checked)}
+                    className="mt-0.5 rounded border-border-medium"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-text-main">Add recommended tasks</div>
+                    <div className="text-xs text-text-muted mt-1">
+                      {actionTemplates.map(t => t.title).join(", ")}
+                    </div>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {selectableDeadlines.length === 0 && actionTemplates.length === 0 && (
+              <div className="text-center py-4 text-sm text-text-muted">
+                No deadline dates available for this school yet.
+              </div>
+            )}
           </div>
         )}
 
@@ -1247,6 +1300,7 @@ function SchoolConfirmWidget({
 interface ProgramDeadline {
   type: string;
   label: string;
+  taskType: "milestone" | "action";
   date: string | null;
   alreadyAdded: boolean;
 }
@@ -1267,6 +1321,8 @@ function ProgramConfirmWidget({
   const [isLoadingDeadlines, setIsLoadingDeadlines] = useState(false);
   const [availableDeadlines, setAvailableDeadlines] = useState<ProgramDeadline[]>([]);
   const [selectedDeadlines, setSelectedDeadlines] = useState<Set<string>>(new Set());
+  const [includeActions, setIncludeActions] = useState(true);
+  const [actionTemplates, setActionTemplates] = useState<Array<{ title: string; daysOffset: number; category: string }>>([]);
   const [createdTasks, setCreatedTasks] = useState<Array<{ title: string; dueDate: string | null }>>([]);
 
   const programName = (data.name as string) || "Unknown Program";
@@ -1290,6 +1346,7 @@ function ProgramConfirmWidget({
       if (response.ok) {
         const result = await response.json();
         setAvailableDeadlines(result.deadlines || []);
+        setActionTemplates(result.actionTemplates || []);
         // Pre-select application deadlines
         const preSelected = new Set<string>();
         for (const d of result.deadlines) {
@@ -1348,14 +1405,19 @@ function ProgramConfirmWidget({
     try {
       onConfirm();
 
-      if (selectedDeadlines.size > 0 && programId) {
+      const deadlinesToImport = Array.from(selectedDeadlines);
+      if (includeActions) {
+        deadlinesToImport.push("include_actions");
+      }
+
+      if (deadlinesToImport.length > 0 && programId) {
         const response = await fetch("/api/plan/import-deadlines", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             type: "program",
             sourceId: programId,
-            deadlines: Array.from(selectedDeadlines),
+            deadlines: deadlinesToImport,
           }),
         });
 
@@ -1386,7 +1448,7 @@ function ProgramConfirmWidget({
         </p>
         {createdTasks.length > 0 && (
           <p className="text-xs text-green-600 mb-3">
-            {createdTasks.length} deadline{createdTasks.length !== 1 ? "s" : ""} added to your plan.
+            {createdTasks.length} item{createdTasks.length !== 1 ? "s" : ""} added to your plan.
           </p>
         )}
         <button
@@ -1430,38 +1492,82 @@ function ProgramConfirmWidget({
           <div className="flex items-center justify-center py-6">
             <Loader2 className="w-6 h-6 text-accent-primary animate-spin" />
           </div>
-        ) : selectableDeadlines.length > 0 ? (
-          <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
-            {selectableDeadlines.map(deadline => (
-              <label
-                key={deadline.type}
-                className={cn(
-                  "flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all",
-                  selectedDeadlines.has(deadline.type)
-                    ? "border-accent-primary bg-accent-surface/50"
-                    : "border-border-subtle bg-white hover:border-accent-primary/50"
-                )}
-              >
-                <input
-                  type="checkbox"
-                  checked={selectedDeadlines.has(deadline.type)}
-                  onChange={() => toggleDeadline(deadline.type)}
-                  className="rounded border-border-medium"
-                />
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-text-main">{deadline.label}</div>
-                  <div className="text-xs text-text-muted">
-                    {deadline.date ? new Date(deadline.date).toLocaleDateString("en-US", {
-                      month: "short", day: "numeric", year: "numeric"
-                    }) : "Date TBD"}
-                  </div>
-                </div>
-              </label>
-            ))}
-          </div>
         ) : (
-          <div className="text-center py-4 text-sm text-text-muted mb-4">
-            No dates available for this program yet.
+          <div className="space-y-4 mb-4">
+            {/* Milestones/Deadlines */}
+            {selectableDeadlines.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+                  Milestones & Deadlines
+                </div>
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {selectableDeadlines.map(deadline => (
+                    <label
+                      key={deadline.type}
+                      className={cn(
+                        "flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-all",
+                        selectedDeadlines.has(deadline.type)
+                          ? "border-accent-primary bg-accent-surface/50"
+                          : "border-border-subtle bg-white hover:border-accent-primary/50"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedDeadlines.has(deadline.type)}
+                        onChange={() => toggleDeadline(deadline.type)}
+                        className="rounded border-border-medium"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-text-main">{deadline.label}</span>
+                          {deadline.taskType === "milestone" && (
+                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded">Info</span>
+                          )}
+                        </div>
+                        <div className="text-xs text-text-muted">
+                          {deadline.date ? new Date(deadline.date).toLocaleDateString("en-US", {
+                            month: "short", day: "numeric", year: "numeric"
+                          }) : "Date TBD"}
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Tasks Toggle */}
+            {actionTemplates.length > 0 && (
+              <div>
+                <label
+                  className={cn(
+                    "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                    includeActions
+                      ? "border-green-500 bg-green-50/50"
+                      : "border-border-subtle bg-white hover:border-green-300"
+                  )}
+                >
+                  <input
+                    type="checkbox"
+                    checked={includeActions}
+                    onChange={(e) => setIncludeActions(e.target.checked)}
+                    className="mt-0.5 rounded border-border-medium"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-text-main">Add recommended tasks</div>
+                    <div className="text-xs text-text-muted mt-1">
+                      {actionTemplates.map(t => t.title).join(", ")}
+                    </div>
+                  </div>
+                </label>
+              </div>
+            )}
+
+            {selectableDeadlines.length === 0 && actionTemplates.length === 0 && (
+              <div className="text-center py-4 text-sm text-text-muted">
+                No dates available for this program yet.
+              </div>
+            )}
           </div>
         )}
 
