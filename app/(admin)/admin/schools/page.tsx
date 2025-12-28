@@ -71,7 +71,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
         notificationEa: true,
         notificationRd: true,
         acceptanceRate: true,
-        updatedAt: true,
+        lastUpdated: true,
       },
     }),
     prisma.school.count({ where }),

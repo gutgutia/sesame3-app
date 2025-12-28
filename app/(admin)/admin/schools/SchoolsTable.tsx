@@ -33,7 +33,7 @@ interface School {
   notificationEa: Date | null;
   notificationRd: Date | null;
   acceptanceRate: number | null;
-  updatedAt: Date;
+  lastUpdated: Date;
 }
 
 interface SchoolsTableProps {

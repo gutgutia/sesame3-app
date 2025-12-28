@@ -17,7 +17,7 @@ interface Program {
   id: string;
   name: string;
   shortName: string | null;
-  institution: string | null;
+  organization: string | null;
   category: string | null;
   focus: string | null;
   applicationOpens: Date | null;
@@ -27,7 +27,6 @@ interface Program {
   startDate: Date | null;
   endDate: Date | null;
   cost: number | null;
-  updatedAt: Date;
 }
 
 interface ProgramsTableProps {
@@ -167,7 +166,7 @@ export function ProgramsTable({
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {program.institution || "—"}
+                    {program.organization || "—"}
                   </td>
                   <td className="px-4 py-3">
                     {program.category && (

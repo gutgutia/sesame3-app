@@ -33,7 +33,7 @@ export default async function ProgramsPage({ searchParams }: PageProps) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
       { shortName: { contains: search, mode: "insensitive" } },
-      { institution: { contains: search, mode: "insensitive" } },
+      { organization: { contains: search, mode: "insensitive" } },
     ];
   }
 
@@ -59,7 +59,7 @@ export default async function ProgramsPage({ searchParams }: PageProps) {
         id: true,
         name: true,
         shortName: true,
-        institution: true,
+        organization: true,
         category: true,
         focus: true,
         applicationOpens: true,
@@ -69,7 +69,6 @@ export default async function ProgramsPage({ searchParams }: PageProps) {
         startDate: true,
         endDate: true,
         cost: true,
-        updatedAt: true,
       },
     }),
     prisma.summerProgram.count({ where }),
