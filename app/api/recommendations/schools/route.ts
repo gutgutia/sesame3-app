@@ -21,13 +21,12 @@ function calculateSchoolMatch(
     satRange75: number | null;
     actRange25: number | null;
     actRange75: number | null;
-    avgGpaUnweighted: number | null;
     acceptanceRate: number | null;
   }
 ): SchoolMatch {
   let satMatch: SchoolMatch["satMatch"] = "unknown";
   let actMatch: SchoolMatch["actMatch"] = "unknown";
-  let gpaMatch: SchoolMatch["gpaMatch"] = "unknown";
+  const gpaMatch: SchoolMatch["gpaMatch"] = "unknown"; // GPA data not available from College Scorecard
   let fitScore = 50; // Start at neutral
 
   // SAT match
@@ -58,22 +57,7 @@ function calculateSchoolMatch(
     }
   }
 
-  // GPA match
-  if (studentGpa && school.avgGpaUnweighted) {
-    const gpaThresholdHigh = Math.min(school.avgGpaUnweighted + 0.2, 4.0);
-    const gpaThresholdLow = school.avgGpaUnweighted - 0.3;
-
-    if (studentGpa >= gpaThresholdHigh) {
-      gpaMatch = "above";
-      fitScore += 10;
-    } else if (studentGpa >= gpaThresholdLow) {
-      gpaMatch = "within";
-      fitScore += 5;
-    } else {
-      gpaMatch = "below";
-      fitScore -= 10;
-    }
-  }
+  // Note: GPA matching disabled - avgGpaUnweighted not available from College Scorecard
 
   // Adjust for acceptance rate
   if (school.acceptanceRate) {
@@ -164,10 +148,9 @@ export async function GET(request: Request) {
       // Search for schools by name (fuzzy match)
       schools = await prisma.school.findMany({
         where: {
-          OR: names.flatMap(name => [
-            { name: { contains: name, mode: "insensitive" } },
-            { shortName: { contains: name, mode: "insensitive" } },
-          ]),
+          OR: names.map(name => ({
+            name: { contains: name, mode: "insensitive" },
+          })),
         },
         take: limit,
       });
@@ -175,10 +158,8 @@ export async function GET(request: Request) {
       // Sort by the order the LLM provided (if possible)
       const nameOrder = new Map(names.map((n, i) => [n.toLowerCase(), i]));
       schools.sort((a, b) => {
-        const aOrder = nameOrder.get(a.name.toLowerCase()) ??
-                       nameOrder.get(a.shortName?.toLowerCase() || "") ?? 999;
-        const bOrder = nameOrder.get(b.name.toLowerCase()) ??
-                       nameOrder.get(b.shortName?.toLowerCase() || "") ?? 999;
+        const aOrder = nameOrder.get(a.name.toLowerCase()) ?? 999;
+        const bOrder = nameOrder.get(b.name.toLowerCase()) ?? 999;
         return aOrder - bOrder;
       });
     } else {
@@ -189,7 +170,7 @@ export async function GET(request: Request) {
           OR: [
             { satRange25: { not: null } },
             { actRange25: { not: null } },
-            { avgGpaUnweighted: { not: null } },
+            { acceptanceRate: { not: null } },
           ],
         },
         take: 100,
@@ -207,7 +188,6 @@ export async function GET(request: Request) {
           satRange75: school.satRange75,
           actRange25: school.actRange25,
           actRange75: school.actRange75,
-          avgGpaUnweighted: school.avgGpaUnweighted,
           acceptanceRate: school.acceptanceRate,
         }
       );
@@ -251,7 +231,6 @@ export async function GET(request: Request) {
       schools: recommendations.map(({ school, match, alreadyOnList }) => ({
         id: school.id,
         name: school.name,
-        shortName: school.shortName,
         city: school.city,
         state: school.state,
         type: school.type,
@@ -260,7 +239,6 @@ export async function GET(request: Request) {
         satRange75: school.satRange75,
         actRange25: school.actRange25,
         actRange75: school.actRange75,
-        avgGpaUnweighted: school.avgGpaUnweighted,
         undergradEnrollment: school.undergradEnrollment,
         alreadyOnList,
         match: {

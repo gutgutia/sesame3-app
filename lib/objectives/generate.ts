@@ -243,7 +243,10 @@ async function computeUpcomingDeadlines(
     }
   }
 
-  // Load school application deadlines (deadlines are on School model)
+  // Load school application deadlines (deadlines are in SchoolDeadlineYear)
+  const currentYear = new Date().getFullYear();
+  const currentCycle = currentYear + 1; // Fall 2025 = applying in 2024-25
+
   const schools = await prisma.studentSchool.findMany({
     where: {
       studentProfileId: profileId,
@@ -254,11 +257,11 @@ async function computeUpcomingDeadlines(
       school: {
         select: {
           name: true,
-          deadlineEd: true,
-          deadlineEd2: true,
-          deadlineEa: true,
-          deadlineRea: true,
-          deadlineRd: true,
+          isRestrictiveEarlyAction: true,
+          deadlineYears: {
+            where: { admissionsCycle: currentCycle },
+            take: 1,
+          },
         },
       },
     },
@@ -267,24 +270,24 @@ async function computeUpcomingDeadlines(
   for (const entry of schools) {
     // Get relevant deadline based on application type
     const appType = entry.applicationType;
+    const yearDeadlines = entry.school.deadlineYears[0];
+    if (!yearDeadlines) continue;
+
     let deadline: Date | null = null;
     let label = entry.school.name;
 
-    if (appType === "ed" && entry.school.deadlineEd) {
-      deadline = entry.school.deadlineEd;
+    if (appType === "ed" && yearDeadlines.deadlineEd) {
+      deadline = yearDeadlines.deadlineEd;
       label = `${entry.school.name} (ED)`;
-    } else if (appType === "ed2" && entry.school.deadlineEd2) {
-      deadline = entry.school.deadlineEd2;
+    } else if (appType === "ed2" && yearDeadlines.deadlineEd2) {
+      deadline = yearDeadlines.deadlineEd2;
       label = `${entry.school.name} (ED2)`;
-    } else if (appType === "ea" && entry.school.deadlineEa) {
-      deadline = entry.school.deadlineEa;
-      label = `${entry.school.name} (EA)`;
-    } else if (appType === "rea" && entry.school.deadlineRea) {
-      deadline = entry.school.deadlineRea;
-      label = `${entry.school.name} (REA)`;
-    } else if (entry.school.deadlineRd) {
+    } else if ((appType === "ea" || appType === "rea") && yearDeadlines.deadlineEa) {
+      deadline = yearDeadlines.deadlineEa;
+      label = `${entry.school.name} (${entry.school.isRestrictiveEarlyAction ? "REA" : "EA"})`;
+    } else if (yearDeadlines.deadlineRd) {
       // Default to RD deadline
-      deadline = entry.school.deadlineRd;
+      deadline = yearDeadlines.deadlineRd;
       label = `${entry.school.name} (RD)`;
     }
 

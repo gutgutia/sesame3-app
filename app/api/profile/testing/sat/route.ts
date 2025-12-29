@@ -52,10 +52,10 @@ export async function POST(request: NextRequest) {
       update: {},
     });
 
-    // Parse scores
-    const math = body.math ? parseInt(body.math) : null;
-    const reading = body.reading ? parseInt(body.reading) : null;
-    const total = body.total ? parseInt(body.total) : ((math || 0) + (reading || 0));
+    // Parse scores - math and reading are required
+    const math = body.math ? parseInt(body.math) : 0;
+    const reading = body.reading ? parseInt(body.reading) : 0;
+    const total = body.total ? parseInt(body.total) : (math + reading);
 
     // Parse test date, default to today if not provided or invalid
     let testDate: Date;

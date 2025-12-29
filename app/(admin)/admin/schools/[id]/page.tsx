@@ -18,6 +18,11 @@ export default async function SchoolEditPage({ params }: PageProps) {
 
   const school = await prisma.school.findUnique({
     where: { id },
+    include: {
+      deadlineYears: {
+        orderBy: { admissionsCycle: "desc" },
+      },
+    },
   });
 
   if (!school) {
@@ -25,14 +30,7 @@ export default async function SchoolEditPage({ params }: PageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">{school.name}</h1>
-        <p className="text-gray-500 mt-1">
-          {school.city && school.state ? `${school.city}, ${school.state}` : school.state || "Location unknown"}
-        </p>
-      </div>
-
+    <div className="max-w-4xl">
       <SchoolEditForm school={school} />
     </div>
   );

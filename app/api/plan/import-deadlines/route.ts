@@ -2,20 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { createClient } from "@/lib/supabase/server";
 
-// Deadline type mappings for schools
+// Deadline type mappings for schools (from SchoolDeadlineYear)
 // type: "action" = completable deadline, "milestone" = informational date marker
 const SCHOOL_DEADLINE_TYPES = {
   early_decision: { field: "deadlineEd", label: "Early Decision", type: "action" as const },
   early_decision_2: { field: "deadlineEd2", label: "Early Decision II", type: "action" as const },
   early_action: { field: "deadlineEa", label: "Early Action", type: "action" as const },
-  restrictive_early_action: { field: "deadlineRea", label: "Restrictive Early Action", type: "action" as const },
   regular_decision: { field: "deadlineRd", label: "Regular Decision", type: "action" as const },
+  priority: { field: "deadlinePriority", label: "Priority Deadline", type: "action" as const },
   financial_aid: { field: "deadlineFinancialAid", label: "Financial Aid", type: "action" as const },
-  commitment: { field: "deadlineCommitment", label: "Enrollment Commitment", type: "milestone" as const },
-  notification_ed: { field: "notificationEd", label: "ED Notification", type: "milestone" as const },
-  notification_ea: { field: "notificationEa", label: "EA Notification", type: "milestone" as const },
-  notification_rd: { field: "notificationRd", label: "RD Notification", type: "milestone" as const },
 } as const;
+
+// Get current admissions cycle
+function getCurrentAdmissionsCycle(): number {
+  const now = new Date();
+  // If we're past August, we're applying for next year's fall
+  return now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear();
+}
 
 // Deadline type mappings for summer programs
 const PROGRAM_DEADLINE_TYPES = {
@@ -85,14 +88,23 @@ export async function POST(request: NextRequest) {
     let createdTasks: Array<{ id: string; title: string; dueDate: Date | null }> = [];
 
     if (type === "school") {
-      // Get school details
+      // Get school details with current year's deadlines
+      const currentCycle = getCurrentAdmissionsCycle();
       const school = await prisma.school.findUnique({
         where: { id: sourceId },
+        include: {
+          deadlineYears: {
+            where: { admissionsCycle: currentCycle },
+            take: 1,
+          },
+        },
       });
 
       if (!school) {
         return NextResponse.json({ error: "School not found" }, { status: 404 });
       }
+
+      const yearDeadlines = school.deadlineYears[0];
 
       // Check if a goal already exists for this school
       let existingGoal = await prisma.goal.findFirst({
@@ -120,12 +132,15 @@ export async function POST(request: NextRequest) {
 
       createdGoal = existingGoal;
 
-      // Create tasks for each selected deadline
+      // Create tasks for each selected deadline (using SchoolDeadlineYear)
       for (const deadlineType of deadlines) {
         const deadlineInfo = SCHOOL_DEADLINE_TYPES[deadlineType as SchoolDeadlineType];
         if (!deadlineInfo) continue;
 
-        const dueDate = school[deadlineInfo.field as keyof typeof school] as Date | null;
+        // Get deadline from yearDeadlines if available
+        const dueDate = yearDeadlines
+          ? (yearDeadlines[deadlineInfo.field as keyof typeof yearDeadlines] as Date | null)
+          : null;
 
         // Check if task already exists
         const existingTask = await prisma.task.findFirst({
@@ -141,7 +156,7 @@ export async function POST(request: NextRequest) {
             data: {
               studentProfileId: profile.id,
               goalId: existingGoal.id,
-              title: `${school.shortName || school.name} ${deadlineInfo.label}`,
+              title: `${school.name} ${deadlineInfo.label}`,
               type: deadlineInfo.type,
               dueDate,
               deadlineType,
@@ -161,7 +176,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Also create default action tasks if they selected "include_actions"
-      if (deadlines.includes("include_actions")) {
+      if (deadlines.includes("include_actions") && yearDeadlines) {
         const primaryDeadlineType = deadlines.find(d =>
           ["early_decision", "early_action", "regular_decision"].includes(d)
         ) as SchoolDeadlineType | undefined;
@@ -169,7 +184,7 @@ export async function POST(request: NextRequest) {
         const primaryDeadlineField = primaryDeadlineType
           ? SCHOOL_DEADLINE_TYPES[primaryDeadlineType].field
           : "deadlineRd";
-        const primaryDeadline = school[primaryDeadlineField as keyof typeof school] as Date | null;
+        const primaryDeadline = yearDeadlines[primaryDeadlineField as keyof typeof yearDeadlines] as Date | null;
 
         if (primaryDeadline) {
           for (const template of DEFAULT_SCHOOL_ACTIONS) {
@@ -189,7 +204,7 @@ export async function POST(request: NextRequest) {
                 data: {
                   studentProfileId: profile.id,
                   goalId: existingGoal.id,
-                  title: `${template.title} - ${school.shortName || school.name}`,
+                  title: `${template.title} - ${school.name}`,
                   type: "action",
                   dueDate,
                   schoolId: sourceId,
@@ -373,13 +388,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === "school") {
+      const currentCycle = getCurrentAdmissionsCycle();
       const school = await prisma.school.findUnique({
         where: { id: sourceId },
+        include: {
+          deadlineYears: {
+            where: { admissionsCycle: currentCycle },
+            take: 1,
+          },
+        },
       });
 
       if (!school) {
         return NextResponse.json({ error: "School not found" }, { status: 404 });
       }
+
+      const yearDeadlines = school.deadlineYears[0];
 
       // Get existing tasks for this school
       const existingTasks = await prisma.task.findMany({
@@ -392,22 +416,24 @@ export async function GET(request: NextRequest) {
 
       const existingTypes = new Set(existingTasks.map(t => t.deadlineType));
 
-      // Build available deadlines
-      const deadlines = Object.entries(SCHOOL_DEADLINE_TYPES).map(([key, info]) => {
-        const date = school[info.field as keyof typeof school] as Date | null;
-        return {
-          type: key,
-          label: info.label,
-          taskType: info.type, // "milestone" or "action"
-          date,
-          alreadyAdded: existingTypes.has(key),
-        };
-      }).filter(d => d.date !== null); // Only show deadlines that have dates
+      // Build available deadlines from SchoolDeadlineYear
+      const deadlines = yearDeadlines
+        ? Object.entries(SCHOOL_DEADLINE_TYPES).map(([key, info]) => {
+            const date = yearDeadlines[info.field as keyof typeof yearDeadlines] as Date | null;
+            return {
+              type: key,
+              label: info.label,
+              taskType: info.type, // "milestone" or "action"
+              date,
+              alreadyAdded: existingTypes.has(key),
+            };
+          }).filter(d => d.date !== null)
+        : [];
 
       return NextResponse.json({
         name: school.name,
-        shortName: school.shortName,
         deadlines,
+        admissionsCycle: currentCycle,
         // Also include the default action templates
         actionTemplates: DEFAULT_SCHOOL_ACTIONS.map(t => ({
           title: t.title,

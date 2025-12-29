@@ -30,16 +30,18 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
-      { shortName: { contains: search, mode: "insensitive" } },
       { city: { contains: search, mode: "insensitive" } },
+      { state: { contains: search, mode: "insensitive" } },
     ];
   }
 
   if (filter === "missing-deadlines") {
+    // Schools that have no admission types configured
     where.AND = [
-      { deadlineRd: null },
-      { deadlineEd: null },
-      { deadlineEa: null },
+      { hasEarlyDecision: false },
+      { hasEarlyDecisionII: false },
+      { hasEarlyAction: false },
+      { hasRollingAdmissions: false },
     ];
   } else if (filter === "pending-review") {
     where.dataStatus = "pending_review";
@@ -56,20 +58,14 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
       select: {
         id: true,
         name: true,
-        shortName: true,
         city: true,
         state: true,
         type: true,
-        deadlineEd: true,
-        deadlineEd2: true,
-        deadlineEa: true,
-        deadlineRea: true,
-        deadlineRd: true,
-        deadlineFinancialAid: true,
-        deadlineCommitment: true,
-        notificationEd: true,
-        notificationEa: true,
-        notificationRd: true,
+        hasEarlyDecision: true,
+        hasEarlyDecisionII: true,
+        hasEarlyAction: true,
+        isRestrictiveEarlyAction: true,
+        hasRollingAdmissions: true,
         acceptanceRate: true,
         lastUpdated: true,
       },
@@ -84,9 +80,7 @@ export default async function SchoolsPage({ searchParams }: PageProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Schools</h1>
-          <p className="text-gray-500 mt-1">
-            {totalCount} schools in database
-          </p>
+          <p className="text-gray-500 mt-1">{totalCount} schools in database</p>
         </div>
         <div className="flex gap-2">
           <a

@@ -518,66 +518,62 @@ model Program {
 
 model School {
   id            String @id @default(uuid())
-  
+
   // Basic Info
   name          String    @unique
-  shortName     String?   // "MIT", "Stanford"
-  
+
   // Location
   city          String?
   state         String?
   country       String   @default("USA")
-  region        String?   // "Northeast" | "West" | "Midwest" | "South"
-  
+
   // Type
   type          String?   // "private" | "public" | "liberal_arts"
-  
-  // Admissions Stats
+
+  // =========================================================================
+  // ADMISSION TYPES - Flags for what application options the school offers
+  // These are relatively stable year-over-year
+  // =========================================================================
+
+  hasEarlyDecision       Boolean  @default(false)  // ED: Binding commitment
+  hasEarlyDecisionII     Boolean  @default(false)  // ED2: Later binding round
+  hasEarlyAction         Boolean  @default(false)  // EA: Non-binding early
+  isRestrictiveEarlyAction Boolean @default(false) // REA/SCEA: EA with restrictions
+  hasRollingAdmissions   Boolean  @default(false)  // Rolling: Decisions on a rolling basis
+  admissionsNotes        String?                   // Special notes about admissions process
+
+  // =========================================================================
+  // ADMISSIONS STATS (from College Scorecard)
+  // =========================================================================
+
   acceptanceRate     Float?   // 0.0 - 1.0
-  edAcceptanceRate   Float?   // Early decision rate
-  eaAcceptanceRate   Float?   // Early action rate
-  
-  // Admitted Student Profile
-  avgGpaUnweighted   Float?
-  avgGpaWeighted     Float?
   satRange25         Int?     // 25th percentile
   satRange75         Int?     // 75th percentile
   actRange25         Int?
   actRange75         Int?
-  
+
   // Size
   undergradEnrollment Int?
-  studentFacultyRatio String?  // "6:1"
-  
+
   // Costs
   tuition            Int?
   roomBoard          Int?
   avgFinancialAid    Int?
-  
-  // Deadlines (updated annually)
-  deadlineEd         DateTime?  // Early Decision
-  deadlineEd2        DateTime?  // ED2
-  deadlineEa         DateTime?  // Early Action
-  deadlineRea        DateTime?  // Restrictive EA
-  deadlineRd         DateTime?  // Regular Decision
-  deadlineFinancialAid DateTime? // CSS Profile / FAFSA priority deadline
-  deadlineCommitment DateTime?  // Enrollment commitment deadline (usually May 1)
-
-  // Notification dates (when decisions come out)
-  notificationEd     DateTime?  // ED notification
-  notificationEa     DateTime?  // EA notification
-  notificationRd     DateTime?  // RD notification
 
   // Links
   websiteUrl         String?
-  admissionsUrl      String?
-  website            String?   // Primary website URL
+
+  // =========================================================================
+  // NOTES - Freeform information dump for LLM context
+  // =========================================================================
+
+  notes              String?   @db.Text  // Large freeform notes field for LLM context
 
   // Metadata
   lastUpdated        DateTime  @default(now())
   dataSource         String?   // "college_scorecard" | "manual" | "common_data_set"
   dataStatus         String?   // "pending_review" | "verified" | "needs_update"
-  
+
   // Relations
   studentSchools StudentSchool[]
   goals          Goal[]
@@ -601,21 +597,23 @@ model SchoolDeadlineYear {
   // Admissions cycle (e.g., 2025 means Fall 2025 enrollment, applying in 2024-2025)
   admissionsCycle Int
 
-  // Application Deadlines
+  // =========================================================================
+  // APPLICATION DEADLINES
+  // Note: REA uses deadlineEa + School.isRestrictiveEarlyAction flag
+  // Note: Commitment deadline is always May 1 (National Decision Day)
+  // =========================================================================
+
   deadlineEd           DateTime?  // Early Decision
-  deadlineEd2          DateTime?  // ED2
-  deadlineEa           DateTime?  // Early Action
-  deadlineRea          DateTime?  // Restrictive EA
+  deadlineEd2          DateTime?  // Early Decision II
+  deadlineEa           DateTime?  // Early Action (also REA if School.isRestrictiveEarlyAction)
   deadlineRd           DateTime?  // Regular Decision
+  deadlinePriority     DateTime?  // Priority deadline for rolling schools
   deadlineFinancialAid DateTime?  // CSS Profile / FAFSA priority deadline
-  deadlineCommitment   DateTime?  // Enrollment commitment (usually May 1)
 
-  // Notification Dates
-  notificationEd       DateTime?  // ED notification
-  notificationEa       DateTime?  // EA notification
-  notificationRd       DateTime?  // RD notification
+  // =========================================================================
+  // DATA QUALITY
+  // =========================================================================
 
-  // Data Quality
   dataSource      String?   // "website" | "common_data_set" | "llm_scraped" | "manual"
   dataConfidence  String?   // "high" | "medium" | "low"
   sourceUrl       String?   // Where the data was found

@@ -81,15 +81,13 @@ export async function calculateChances(
       satRange75: true,
       actRange25: true,
       actRange75: true,
-      avgGpaUnweighted: true,
-      avgGpaWeighted: true,
     },
   });
-  
+
   if (!school) {
     throw new Error("School not found");
   }
-  
+
   const schoolData: SchoolData = {
     id: school.id,
     name: school.name,
@@ -98,8 +96,9 @@ export async function calculateChances(
     satRange75: school.satRange75,
     actRange25: school.actRange25,
     actRange75: school.actRange75,
-    avgGpaUnweighted: school.avgGpaUnweighted,
-    avgGpaWeighted: school.avgGpaWeighted,
+    // GPA data not available from College Scorecard - using null
+    avgGpaUnweighted: null,
+    avgGpaWeighted: null,
   };
   
   // Calculate quantitative base

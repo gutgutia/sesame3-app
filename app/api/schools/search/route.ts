@@ -19,19 +19,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ schools: [], message: "Query too short" });
     }
 
-    // Search by name or shortName
+    // Search by name or city
     const schools = await prisma.school.findMany({
       where: {
         OR: [
           { name: { contains: query, mode: "insensitive" } },
-          { shortName: { contains: query, mode: "insensitive" } },
           { city: { contains: query, mode: "insensitive" } },
+          { state: { contains: query, mode: "insensitive" } },
         ],
       },
       select: {
         id: true,
         name: true,
-        shortName: true,
         city: true,
         state: true,
         type: true,

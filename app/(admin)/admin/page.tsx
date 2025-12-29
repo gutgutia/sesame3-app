@@ -17,13 +17,14 @@ export default async function AdminDashboard() {
     prisma.studentProfile.count(),
   ]);
 
-  // Find schools/programs missing deadline data
+  // Find schools/programs missing configuration
   const schoolsMissingDeadlines = await prisma.school.count({
     where: {
       AND: [
-        { deadlineRd: null },
-        { deadlineEd: null },
-        { deadlineEa: null },
+        { hasEarlyDecision: false },
+        { hasEarlyDecisionII: false },
+        { hasEarlyAction: false },
+        { hasRollingAdmissions: false },
       ],
     },
   });

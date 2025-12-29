@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
           select: { id: true, title: true, category: true },
         },
         school: {
-          select: { id: true, name: true, shortName: true },
+          select: { id: true, name: true },
         },
         summerProgram: {
           select: { id: true, name: true, shortName: true },
@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
       targetDate: Date | null;
       category: string;
       status: string;
-      school?: { id: string; name: string; shortName: string | null } | null;
+      school?: { id: string; name: string } | null;
       summerProgram?: { id: string; name: string; shortName: string | null } | null;
     }> = [];
 
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
         },
         include: {
           school: {
-            select: { id: true, name: true, shortName: true },
+            select: { id: true, name: true },
           },
           summerProgram: {
             select: { id: true, name: true, shortName: true },
