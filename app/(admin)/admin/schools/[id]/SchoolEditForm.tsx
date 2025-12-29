@@ -8,9 +8,9 @@ import {
   Loader2,
   ExternalLink,
   Sparkles,
-  Plus,
   Trash2,
   Info,
+  Calendar,
 } from "lucide-react";
 import { ADMISSION_TYPES } from "@/lib/data/admission-types";
 
@@ -75,23 +75,22 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
     notes: school.notes || "",
   });
 
-  // State for deadline years
-  const [deadlineYears, setDeadlineYears] = useState<
-    Array<{
-      id: string | null;
-      admissionsCycle: number;
-      deadlineEd: string;
-      deadlineEd2: string;
-      deadlineEa: string;
-      deadlineRd: string;
-      deadlinePriority: string;
-      deadlineFinancialAid: string;
-      dataSource: string;
-      dataConfidence: string;
-      isNew?: boolean;
-    }>
-  >(
-    school.deadlineYears.map((dy) => ({
+  type DeadlineYearState = {
+    id: string | null;
+    admissionsCycle: number;
+    deadlineEd: string;
+    deadlineEd2: string;
+    deadlineEa: string;
+    deadlineRd: string;
+    deadlinePriority: string;
+    deadlineFinancialAid: string;
+    dataSource: string;
+    dataConfidence: string;
+  };
+
+  // Initialize deadline years - auto-create current cycle if it doesn't exist
+  const initializeDeadlineYears = (): DeadlineYearState[] => {
+    const existingYears: DeadlineYearState[] = school.deadlineYears.map((dy) => ({
       id: dy.id,
       admissionsCycle: dy.admissionsCycle,
       deadlineEd: formatDateForInput(dy.deadlineEd),
@@ -102,14 +101,35 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
       deadlineFinancialAid: formatDateForInput(dy.deadlineFinancialAid),
       dataSource: dy.dataSource || "manual",
       dataConfidence: dy.dataConfidence || "low",
-    }))
-  );
+    }));
 
-  // Selected year for editing
-  const [selectedCycle, setSelectedCycle] = useState(
-    deadlineYears.find((dy) => dy.admissionsCycle === currentCycle)
-      ?.admissionsCycle || currentCycle
-  );
+    // Auto-add current cycle if it doesn't exist
+    const hasCurrentCycle = existingYears.some(
+      (dy) => dy.admissionsCycle === currentCycle
+    );
+    if (!hasCurrentCycle) {
+      existingYears.push({
+        id: null,
+        admissionsCycle: currentCycle,
+        deadlineEd: "",
+        deadlineEd2: "",
+        deadlineEa: "",
+        deadlineRd: "",
+        deadlinePriority: "",
+        deadlineFinancialAid: "",
+        dataSource: "manual",
+        dataConfidence: "low",
+      });
+    }
+
+    return existingYears;
+  };
+
+  // State for deadline years
+  const [deadlineYears, setDeadlineYears] = useState<DeadlineYearState[]>(initializeDeadlineYears);
+
+  // Selected year for editing - default to current cycle
+  const [selectedCycle, setSelectedCycle] = useState(currentCycle);
 
   function formatDateForInput(date: Date | null | undefined): string {
     if (!date) return "";
@@ -127,34 +147,53 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
     setSuccess(false);
   };
 
-  const handleDeadlineChange = (cycle: number, field: string, value: string) => {
-    setDeadlineYears((prev) =>
-      prev.map((dy) =>
+  const handleDeadlineChange = (cycle: number, field: keyof DeadlineYearState, value: string) => {
+    setDeadlineYears((prev) => {
+      // If this cycle doesn't exist yet, create it
+      const exists = prev.some((dy) => dy.admissionsCycle === cycle);
+      if (!exists) {
+        const newYear: DeadlineYearState = {
+          id: null,
+          admissionsCycle: cycle,
+          deadlineEd: "",
+          deadlineEd2: "",
+          deadlineEa: "",
+          deadlineRd: "",
+          deadlinePriority: "",
+          deadlineFinancialAid: "",
+          dataSource: "manual",
+          dataConfidence: "low",
+        };
+        // Type-safe field assignment
+        if (field !== "id" && field !== "admissionsCycle") {
+          newYear[field] = value;
+        }
+        return [...prev, newYear];
+      }
+      // Update existing cycle
+      return prev.map((dy) =>
         dy.admissionsCycle === cycle ? { ...dy, [field]: value } : dy
-      )
-    );
+      );
+    });
     setSuccess(false);
   };
 
   const addDeadlineYear = (cycle: number) => {
     if (deadlineYears.some((dy) => dy.admissionsCycle === cycle)) return;
 
-    setDeadlineYears((prev) => [
-      ...prev,
-      {
-        id: null,
-        admissionsCycle: cycle,
-        deadlineEd: "",
-        deadlineEd2: "",
-        deadlineEa: "",
-        deadlineRd: "",
-        deadlinePriority: "",
-        deadlineFinancialAid: "",
-        dataSource: "manual",
-        dataConfidence: "low",
-        isNew: true,
-      },
-    ]);
+    const newYear: DeadlineYearState = {
+      id: null,
+      admissionsCycle: cycle,
+      deadlineEd: "",
+      deadlineEd2: "",
+      deadlineEa: "",
+      deadlineRd: "",
+      deadlinePriority: "",
+      deadlineFinancialAid: "",
+      dataSource: "manual",
+      dataConfidence: "low",
+    };
+    setDeadlineYears((prev) => [...prev, newYear]);
     setSelectedCycle(cycle);
   };
 
@@ -371,129 +410,115 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
           <div>
             <h2 className="font-bold text-lg">Application Deadlines</h2>
             <p className="text-sm text-gray-500">
-              Manage deadlines for each admissions cycle
+              Fall {selectedCycle} admissions cycle
             </p>
           </div>
-          <button
-            type="button"
-            onClick={handleRunLlm}
-            disabled={isRunningLlm}
-            className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 disabled:opacity-50"
-          >
-            {isRunningLlm ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Sparkles className="w-4 h-4" />
-            )}
-            Auto-fill with AI
-          </button>
-        </div>
-
-        {/* Cycle Tabs */}
-        <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2">
-          {deadlineYears
-            .sort((a, b) => b.admissionsCycle - a.admissionsCycle)
-            .map((dy) => (
-              <button
-                key={dy.admissionsCycle}
-                type="button"
-                onClick={() => setSelectedCycle(dy.admissionsCycle)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  selectedCycle === dy.admissionsCycle
-                    ? "bg-slate-900 text-white"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                }`}
-              >
-                Fall {dy.admissionsCycle}
-              </button>
-            ))}
-
-          {/* Add new year button */}
-          <div className="relative group">
+          <div className="flex items-center gap-2">
+            {/* Year selector */}
+            <select
+              value={selectedCycle}
+              onChange={(e) => {
+                const year = parseInt(e.target.value);
+                if (!deadlineYears.some((dy) => dy.admissionsCycle === year)) {
+                  addDeadlineYear(year);
+                }
+                setSelectedCycle(year);
+              }}
+              className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+            >
+              {[currentCycle + 1, currentCycle, currentCycle - 1].map((year) => (
+                <option key={year} value={year}>
+                  Fall {year}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+              onClick={handleRunLlm}
+              disabled={isRunningLlm}
+              className="flex items-center gap-2 px-3 py-1.5 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 disabled:opacity-50"
             >
-              <Plus className="w-4 h-4" />
-            </button>
-            <div className="absolute left-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 hidden group-hover:block z-10">
-              {[currentCycle + 1, currentCycle, currentCycle - 1].map(
-                (year) =>
-                  !deadlineYears.some((dy) => dy.admissionsCycle === year) && (
-                    <button
-                      key={year}
-                      type="button"
-                      onClick={() => addDeadlineYear(year)}
-                      className="w-full px-3 py-1.5 text-sm text-left hover:bg-gray-50"
-                    >
-                      Fall {year}
-                    </button>
-                  )
+              {isRunningLlm ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
               )}
-            </div>
+              Auto-fill with AI
+            </button>
           </div>
         </div>
 
-        {/* Deadline Fields */}
-        {selectedDeadlineYear ? (
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {formData.hasEarlyDecision && (
-                <DateField
-                  label="Early Decision"
-                  value={selectedDeadlineYear.deadlineEd}
-                  onChange={(v) =>
-                    handleDeadlineChange(selectedCycle, "deadlineEd", v)
-                  }
-                />
-              )}
-              {formData.hasEarlyDecisionII && (
-                <DateField
-                  label="Early Decision II"
-                  value={selectedDeadlineYear.deadlineEd2}
-                  onChange={(v) =>
-                    handleDeadlineChange(selectedCycle, "deadlineEd2", v)
-                  }
-                />
-              )}
-              {formData.hasEarlyAction && (
-                <DateField
-                  label={
-                    formData.isRestrictiveEarlyAction
-                      ? "Restrictive EA"
-                      : "Early Action"
-                  }
-                  value={selectedDeadlineYear.deadlineEa}
-                  onChange={(v) =>
-                    handleDeadlineChange(selectedCycle, "deadlineEa", v)
-                  }
-                />
-              )}
+        {/* Deadline Fields - always show based on admission types */}
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {formData.hasEarlyDecision && (
               <DateField
-                label="Regular Decision"
-                value={selectedDeadlineYear.deadlineRd}
+                label="Early Decision"
+                value={selectedDeadlineYear?.deadlineEd || ""}
                 onChange={(v) =>
-                  handleDeadlineChange(selectedCycle, "deadlineRd", v)
+                  handleDeadlineChange(selectedCycle, "deadlineEd", v)
                 }
               />
-              {formData.hasRollingAdmissions && (
-                <DateField
-                  label="Priority Deadline"
-                  value={selectedDeadlineYear.deadlinePriority}
-                  onChange={(v) =>
-                    handleDeadlineChange(selectedCycle, "deadlinePriority", v)
-                  }
-                />
-              )}
+            )}
+            {formData.hasEarlyDecisionII && (
               <DateField
-                label="Financial Aid Priority"
-                value={selectedDeadlineYear.deadlineFinancialAid}
+                label="Early Decision II"
+                value={selectedDeadlineYear?.deadlineEd2 || ""}
                 onChange={(v) =>
-                  handleDeadlineChange(selectedCycle, "deadlineFinancialAid", v)
+                  handleDeadlineChange(selectedCycle, "deadlineEd2", v)
                 }
               />
-            </div>
+            )}
+            {formData.hasEarlyAction && (
+              <DateField
+                label={
+                  formData.isRestrictiveEarlyAction
+                    ? "Restrictive EA"
+                    : "Early Action"
+                }
+                value={selectedDeadlineYear?.deadlineEa || ""}
+                onChange={(v) =>
+                  handleDeadlineChange(selectedCycle, "deadlineEa", v)
+                }
+              />
+            )}
+            <DateField
+              label="Regular Decision"
+              value={selectedDeadlineYear?.deadlineRd || ""}
+              onChange={(v) =>
+                handleDeadlineChange(selectedCycle, "deadlineRd", v)
+              }
+            />
+            {formData.hasRollingAdmissions && (
+              <DateField
+                label="Priority Deadline"
+                value={selectedDeadlineYear?.deadlinePriority || ""}
+                onChange={(v) =>
+                  handleDeadlineChange(selectedCycle, "deadlinePriority", v)
+                }
+              />
+            )}
+            <DateField
+              label="Financial Aid Priority"
+              value={selectedDeadlineYear?.deadlineFinancialAid || ""}
+              onChange={(v) =>
+                handleDeadlineChange(selectedCycle, "deadlineFinancialAid", v)
+              }
+            />
+          </div>
 
+          {/* Show hint if no admission types selected */}
+          {!formData.hasEarlyDecision &&
+            !formData.hasEarlyDecisionII &&
+            !formData.hasEarlyAction &&
+            !formData.hasRollingAdmissions && (
+              <div className="flex items-center gap-2 p-3 bg-amber-50 text-amber-700 rounded-lg text-sm">
+                <Calendar className="w-4 h-4" />
+                Select admission types above to see more deadline fields
+              </div>
+            )}
+
+          {selectedDeadlineYear && (
             <div className="flex items-center justify-between pt-2 border-t border-gray-100">
               <div className="flex items-center gap-4 text-sm text-gray-500">
                 <span>
@@ -535,28 +560,19 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
                 </span>
               </div>
 
-              <button
-                type="button"
-                onClick={() => removeDeadlineYear(selectedCycle)}
-                className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-              >
-                <Trash2 className="w-3 h-3" />
-                Remove year
-              </button>
+              {deadlineYears.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeDeadlineYear(selectedCycle)}
+                  className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Remove year
+                </button>
+              )}
             </div>
-          </div>
-        ) : (
-          <div className="text-center py-8 text-gray-500">
-            <p>No deadline data for Fall {selectedCycle}</p>
-            <button
-              type="button"
-              onClick={() => addDeadlineYear(selectedCycle)}
-              className="mt-2 text-sm text-slate-900 hover:underline"
-            >
-              Add deadlines for this cycle
-            </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Basic Stats */}

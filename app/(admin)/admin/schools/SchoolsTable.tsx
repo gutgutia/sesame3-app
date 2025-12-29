@@ -7,9 +7,6 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
-  Check,
-  X,
-  Edit2,
   ExternalLink,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -159,7 +156,11 @@ export function SchoolsTable({
               const admissionTypes = getAdmissionTypes(school);
 
               return (
-                <tr key={school.id} className="hover:bg-gray-50">
+                <tr
+                  key={school.id}
+                  className="hover:bg-gray-50 cursor-pointer"
+                  onClick={() => router.push(`/admin/schools/${school.id}`)}
+                >
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900">
                       {school.name}
@@ -201,14 +202,10 @@ export function SchoolsTable({
                       : "—"}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <a
-                        href={`/admin/schools/${school.id}`}
-                        className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
-                        title="Edit"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </a>
+                    <div
+                      className="flex items-center justify-end gap-1"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <a
                         href={`https://www.google.com/search?q=${encodeURIComponent(school.name + " admissions deadlines")}`}
                         target="_blank"
