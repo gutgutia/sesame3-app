@@ -165,7 +165,23 @@ async function removeDuplicatePrograms() {
   console.log(`\nRemoved ${deletedCount} duplicate programs`);
 }
 
+function printClearAllWarning() {
+  console.log("\n" + "=".repeat(60));
+  console.log("⚠️  WARNING: CLEARING ALL DATA");
+  console.log("=".repeat(60));
+  console.log("\nThis will DELETE the following data:");
+  console.log("  - All Users and their profiles");
+  console.log("  - All Student data (academics, activities, awards, etc.)");
+  console.log("  - All Conversations and messages");
+  console.log("  - All Schools and deadline data");
+  console.log("  - All Summer Programs and sessions");
+  console.log("\nThis action is IRREVERSIBLE!");
+  console.log("=".repeat(60) + "\n");
+}
+
 async function clearAll() {
+  printClearAllWarning();
+
   console.log("=== CLEARING ALL DATA ===\n");
 
   await clearUsers();
@@ -176,7 +192,9 @@ async function clearAll() {
 
   await clearSummerPrograms();
 
-  console.log("\n=== ALL DATA CLEARED ===");
+  console.log("\n" + "=".repeat(60));
+  console.log("=== ALL DATA CLEARED ===");
+  console.log("=".repeat(60));
 }
 
 function showHelp() {
@@ -211,7 +229,6 @@ async function main() {
 
   try {
     if (args.includes("--all")) {
-      console.log("\n⚠️  WARNING: This will delete ALL data!\n");
       await clearAll();
     } else if (args.includes("--programs")) {
       await clearSummerPrograms();
