@@ -37,6 +37,17 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  function formatDateForInput(date: Date | null | undefined): string {
+    if (!date) return "";
+    try {
+      const d = new Date(date);
+      if (isNaN(d.getTime())) return "";
+      return d.toISOString().split("T")[0];
+    } catch {
+      return "";
+    }
+  }
+
   const [formData, setFormData] = useState({
     shortName: school.shortName || "",
     website: school.website || "",
@@ -52,11 +63,6 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
     notificationEa: formatDateForInput(school.notificationEa),
     notificationRd: formatDateForInput(school.notificationRd),
   });
-
-  function formatDateForInput(date: Date | null): string {
-    if (!date) return "";
-    return new Date(date).toISOString().split("T")[0];
-  }
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -119,15 +125,23 @@ export function SchoolEditForm({ school }: SchoolEditFormProps) {
       const data = await res.json();
 
       // Update form with LLM results
+      // The LLM returns date strings in YYYY-MM-DD format directly
       if (data.deadlines) {
-        setFormData((prev) => ({
-          ...prev,
-          ...Object.fromEntries(
-            Object.entries(data.deadlines)
-              .filter(([, v]) => v !== null)
-              .map(([k, v]) => [k, formatDateForInput(new Date(v as string))])
-          ),
-        }));
+        const dateFields = [
+          "deadlineEd", "deadlineEd2", "deadlineEa", "deadlineRea",
+          "deadlineRd", "deadlineFinancialAid", "deadlineCommitment",
+          "notificationEd", "notificationEa", "notificationRd"
+        ];
+        const updates: Record<string, string> = {};
+        for (const field of dateFields) {
+          const value = data.deadlines[field];
+          if (value && typeof value === "string" && value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            updates[field] = value;
+          }
+        }
+        if (Object.keys(updates).length > 0) {
+          setFormData((prev) => ({ ...prev, ...updates }));
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "LLM scraping failed");
