@@ -1,45 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { generateObject } from "ai";
+import { z } from "zod";
 import { requireAdmin } from "@/lib/admin";
-import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "@/lib/ai/providers";
 
-const DEADLINE_EXTRACTION_PROMPT = `You are a helpful assistant that extracts college admissions deadline information.
-
-Given a college/university name, search for and extract their application deadlines for the current admissions cycle.
-
-Look for:
-- Early Decision (ED) deadline
-- Early Decision II (ED2) deadline
-- Early Action (EA) deadline
-- Restrictive Early Action (REA) deadline
-- Regular Decision (RD) deadline
-- Financial Aid deadline
-- ED notification date
-- EA notification date
-- RD notification date
-- Enrollment commitment deadline (usually May 1)
-
-Return the data as JSON in this exact format:
-{
-  "deadlineEd": "YYYY-MM-DD" or null,
-  "deadlineEd2": "YYYY-MM-DD" or null,
-  "deadlineEa": "YYYY-MM-DD" or null,
-  "deadlineRea": "YYYY-MM-DD" or null,
-  "deadlineRd": "YYYY-MM-DD" or null,
-  "deadlineFinancialAid": "YYYY-MM-DD" or null,
-  "notificationEd": "YYYY-MM-DD" or null,
-  "notificationEa": "YYYY-MM-DD" or null,
-  "notificationRd": "YYYY-MM-DD" or null,
-  "deadlineCommitment": "YYYY-MM-DD" or null,
-  "confidence": "high" | "medium" | "low",
-  "source": "URL where you found this information"
-}
-
-Only include dates you are confident about. Use null for any dates you cannot find or are uncertain about.
-Return ONLY the JSON, no other text.`;
+// Schema for deadline extraction
+const DeadlineExtractionSchema = z.object({
+  deadlineEd: z.string().nullable().describe("Early Decision deadline (YYYY-MM-DD format)"),
+  deadlineEd2: z.string().nullable().describe("Early Decision II deadline (YYYY-MM-DD format)"),
+  deadlineEa: z.string().nullable().describe("Early Action deadline (YYYY-MM-DD format)"),
+  deadlineRea: z.string().nullable().describe("Restrictive Early Action deadline (YYYY-MM-DD format)"),
+  deadlineRd: z.string().nullable().describe("Regular Decision deadline (YYYY-MM-DD format)"),
+  deadlineFinancialAid: z.string().nullable().describe("Financial Aid priority deadline (YYYY-MM-DD format)"),
+  notificationEd: z.string().nullable().describe("ED notification date (YYYY-MM-DD format)"),
+  notificationEa: z.string().nullable().describe("EA notification date (YYYY-MM-DD format)"),
+  notificationRd: z.string().nullable().describe("RD notification date (YYYY-MM-DD format)"),
+  deadlineCommitment: z.string().nullable().describe("Enrollment commitment deadline, usually May 1 (YYYY-MM-DD format)"),
+  confidence: z.enum(["high", "medium", "low"]).describe("How confident you are in this data"),
+  source: z.string().nullable().describe("URL or source where this information was found"),
+  notes: z.string().nullable().describe("Any additional notes about the deadlines"),
+});
 
 /**
  * POST /api/admin/llm/scrape-deadlines
- * Use LLM to search for and extract deadline information
+ * Use LLM to extract deadline information based on knowledge
  */
 export async function POST(request: NextRequest) {
   try {
@@ -59,64 +43,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize Anthropic client
-    const anthropic = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-    });
-
-    // Build the search query
     const currentYear = new Date().getFullYear();
     const admissionsCycle = `${currentYear}-${currentYear + 1}`;
 
-    let searchPrompt: string;
+    let prompt: string;
     if (type === "school") {
-      searchPrompt = `Find the admissions deadlines for ${name} for the ${admissionsCycle} admissions cycle. Look for their official admissions website.`;
+      prompt = `Extract the college admissions deadlines for "${name}" for the ${admissionsCycle} admissions cycle.
+
+Based on your knowledge, provide the typical deadlines for this school. Common patterns:
+- Most schools have ED around November 1-15
+- EA is usually November 1-15
+- RD is usually January 1-15
+- ED2 is usually January 1-15
+- Financial aid deadlines often align with application deadlines
+- ED notification is typically mid-December
+- EA notification is typically mid-December to early February
+- RD notification is typically late March to early April
+- Commitment deadline is usually May 1
+
+If you're not confident about specific dates for this school, use null and set confidence to "low".
+Only provide dates you have reasonable confidence about.`;
     } else {
-      searchPrompt = `Find the application deadlines for the ${name} summer program for ${currentYear}. Look for their official program website.`;
+      prompt = `Extract the application deadlines for the "${name}" summer program for ${currentYear}.
+
+Provide any deadlines you know about, including:
+- Application deadline
+- Early/priority deadline (if applicable)
+- Notification date
+- Program dates
+
+If you're not confident about specific dates, use null and set confidence to "low".`;
     }
 
-    // Use Claude to extract deadline information
-    // Note: In production, you'd want to use web search or browsing capabilities
-    // For now, we'll use Claude's knowledge (which may be outdated)
-    const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: `${DEADLINE_EXTRACTION_PROMPT}\n\nSchool/Program: ${name}\nAdmissions Cycle: ${admissionsCycle}\n\n${searchPrompt}`,
-        },
-      ],
+    const result = await generateObject({
+      model: modelFor.fast, // Using Haiku for speed/cost
+      schema: DeadlineExtractionSchema,
+      prompt,
     });
-
-    // Extract the text content
-    const textContent = response.content.find((c) => c.type === "text");
-    if (!textContent || textContent.type !== "text") {
-      throw new Error("No text response from LLM");
-    }
-
-    // Parse the JSON response
-    let deadlines;
-    try {
-      // Try to extract JSON from the response
-      const jsonMatch = textContent.text.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        deadlines = JSON.parse(jsonMatch[0]);
-      } else {
-        throw new Error("No JSON found in response");
-      }
-    } catch (parseError) {
-      console.error("Failed to parse LLM response:", textContent.text);
-      return NextResponse.json(
-        { error: "Failed to parse LLM response", raw: textContent.text },
-        { status: 500 }
-      );
-    }
 
     return NextResponse.json({
       success: true,
-      deadlines,
-      raw: textContent.text,
+      deadlines: result.object,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "Unauthorized") {
@@ -124,7 +91,7 @@ export async function POST(request: NextRequest) {
     }
     console.error("[LLM Scrape] Error:", error);
     return NextResponse.json(
-      { error: "Failed to scrape deadlines" },
+      { error: "Failed to scrape deadlines", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
   }
