@@ -71,7 +71,22 @@ export function Sidebar() {
   const { profile } = useProfile();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
+  const [isAdmin, setIsAdmin] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Check if user is admin
+  useEffect(() => {
+    fetch("/api/user/me")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data?.isAdmin) {
+          setIsAdmin(true);
+        }
+      })
+      .catch(() => {
+        // Ignore errors - just don't show admin
+      });
+  }, []);
 
   // Get user's display name and initials
   const displayName = profile?.preferredName || profile?.firstName || "Student";
@@ -227,14 +242,16 @@ export function Sidebar() {
               <Settings className="w-4 h-4" />
               Settings
             </Link>
-            <Link
-              href="/admin"
-              onClick={() => setIsDropdownOpen(false)}
-              className="flex items-center gap-3 px-4 py-3 text-sm text-amber-600 hover:bg-amber-50 transition-colors"
-            >
-              <Shield className="w-4 h-4" />
-              Admin
-            </Link>
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setIsDropdownOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 text-sm text-amber-600 hover:bg-amber-50 transition-colors"
+              >
+                <Shield className="w-4 h-4" />
+                Admin
+              </Link>
+            )}
             <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-500 hover:bg-red-50 transition-colors"
