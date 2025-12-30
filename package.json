@@ -23,7 +23,15 @@
     "db:fix-duplicates": "dotenv -e .env.local -- tsx prisma/db-cleanup.ts --duplicates",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "ux-audit": "playwright test e2e/tests/ux-audit.spec.ts --project='Desktop Chrome'",
+    "ux-audit:all": "playwright test e2e/tests/ux-audit.spec.ts",
+    "ux-audit:mobile": "playwright test e2e/tests/ux-audit.spec.ts --project='Mobile Safari'",
+    "test:report": "playwright show-report"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.56",
@@ -50,6 +58,7 @@
     "zod": "^4.1.13"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
