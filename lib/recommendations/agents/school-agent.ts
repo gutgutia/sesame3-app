@@ -8,6 +8,7 @@
 import { generateObject } from "ai";
 import { z } from "zod";
 import { modelFor } from "@/lib/ai/providers";
+import { prisma } from "@/lib/db";
 import type { RecommendationInput, GeneratedRecommendation } from "../types";
 
 const SchoolRecommendationSchema = z.object({
@@ -55,7 +56,11 @@ export async function generateSchoolRecommendations(
       prompt,
     });
 
-    // Convert to GeneratedRecommendation format
+    // Try to match school names to our database
+    const schoolNames = object.recommendations.map((rec) => rec.name);
+    const matchedSchools = await matchSchoolsToDatabase(schoolNames);
+
+    // Convert to GeneratedRecommendation format with schoolId if matched
     return object.recommendations.map((rec) => ({
       category: "school" as const,
       title: rec.name,
@@ -65,11 +70,66 @@ export async function generateSchoolRecommendations(
       priority: rec.priority,
       actionItems: rec.actionItems,
       relevantGrade: stage.grade,
+      schoolId: matchedSchools.get(rec.name.toLowerCase()),
     }));
   } catch (error) {
     console.error("Error generating school recommendations:", error);
     return [];
   }
+}
+
+/**
+ * Try to match school names to our database
+ * Uses case-insensitive matching and common variations
+ */
+async function matchSchoolsToDatabase(
+  schoolNames: string[]
+): Promise<Map<string, string>> {
+  const matchMap = new Map<string, string>();
+
+  // Get all schools that might match (using ILIKE for case-insensitive)
+  const schools = await prisma.school.findMany({
+    where: {
+      OR: schoolNames.map((name) => ({
+        name: { contains: name.split(" ")[0], mode: "insensitive" as const },
+      })),
+    },
+    select: { id: true, name: true },
+  });
+
+  // Create a map for quick lookup
+  const dbSchoolMap = new Map(
+    schools.map((s) => [s.name.toLowerCase(), s.id])
+  );
+
+  // Try to match each recommended school
+  for (const name of schoolNames) {
+    const lowerName = name.toLowerCase();
+
+    // Exact match
+    if (dbSchoolMap.has(lowerName)) {
+      matchMap.set(lowerName, dbSchoolMap.get(lowerName)!);
+      continue;
+    }
+
+    // Try common variations
+    const variations = [
+      lowerName,
+      lowerName.replace(" university", ""),
+      lowerName.replace("university of ", ""),
+      lowerName + " university",
+      "university of " + lowerName,
+    ];
+
+    for (const variation of variations) {
+      if (dbSchoolMap.has(variation)) {
+        matchMap.set(lowerName, dbSchoolMap.get(variation)!);
+        break;
+      }
+    }
+  }
+
+  return matchMap;
 }
 
 function buildSchoolPrompt(
@@ -173,10 +233,15 @@ function buildSchoolPrompt(
     }
   }
 
-  // Schools already on list
-  if (profile.existingSchoolIds.length > 0) {
+  // Schools already on list - IMPORTANT: list actual names so LLM doesn't recommend duplicates
+  if (profile.existingSchoolNames.length > 0) {
     parts.push("");
-    parts.push(`Note: The student already has ${profile.existingSchoolIds.length} schools on their list. Focus on schools that would complement their existing choices.`);
+    parts.push("### Schools Already on List (DO NOT RECOMMEND THESE)");
+    profile.existingSchoolNames.forEach((name) => {
+      parts.push(`- ${name}`);
+    });
+    parts.push("");
+    parts.push("Focus on schools that would complement their existing choices. Do not recommend any school listed above.");
   }
 
   // Current stage context

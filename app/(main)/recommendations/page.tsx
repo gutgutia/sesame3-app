@@ -12,6 +12,8 @@ import {
   CheckCircle2,
   Clock,
   AlertCircle,
+  Plus,
+  Check,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
@@ -33,6 +35,8 @@ interface Recommendation {
   expiresAt: string | null;
   status: string;
   generatedAt: string;
+  schoolId: string | null;
+  summerProgramId: string | null;
   school?: { id: string; name: string; city: string | null; state: string | null } | null;
   summerProgram?: { id: string; name: string; organization: string } | null;
 }
@@ -128,6 +132,52 @@ export default function RecommendationsPage() {
       );
     } catch (err) {
       console.error("Failed to save recommendation:", err);
+    }
+  };
+
+  // Add school/program to list
+  const addToList = async (rec: Recommendation) => {
+    try {
+      if (rec.category === "school" && rec.schoolId) {
+        // Add school to student's list
+        const res = await fetch("/api/schools/list", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            schoolId: rec.schoolId,
+            tier: rec.subtitle?.toLowerCase().includes("reach")
+              ? "reach"
+              : rec.subtitle?.toLowerCase().includes("safety")
+                ? "safety"
+                : "target",
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add school");
+      } else if (rec.category === "program" && rec.summerProgramId) {
+        // Add program to student's list
+        const res = await fetch("/api/programs/list", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            summerProgramId: rec.summerProgramId,
+            applicationYear: new Date().getFullYear() + 1,
+          }),
+        });
+        if (!res.ok) throw new Error("Failed to add program");
+      }
+
+      // Mark recommendation as acted upon
+      await fetch(`/api/recommendations/${rec.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "acted_upon" }),
+      });
+
+      setRecommendations((prev) =>
+        prev.map((r) => (r.id === rec.id ? { ...r, status: "acted_upon" } : r))
+      );
+    } catch (err) {
+      console.error("Failed to add to list:", err);
     }
   };
 
@@ -253,6 +303,7 @@ export default function RecommendationsPage() {
               recommendations={schoolRecs}
               onDismiss={dismissRecommendation}
               onSave={saveRecommendation}
+              onAddToList={addToList}
             />
           )}
 
@@ -264,6 +315,7 @@ export default function RecommendationsPage() {
               recommendations={programRecs}
               onDismiss={dismissRecommendation}
               onSave={saveRecommendation}
+              onAddToList={addToList}
             />
           )}
 
@@ -275,6 +327,7 @@ export default function RecommendationsPage() {
               recommendations={generalRecs}
               onDismiss={dismissRecommendation}
               onSave={saveRecommendation}
+              onAddToList={addToList}
             />
           )}
         </div>
@@ -293,12 +346,14 @@ function RecommendationSection({
   recommendations,
   onDismiss,
   onSave,
+  onAddToList,
 }: {
   title: string;
   icon: React.ElementType;
   recommendations: Recommendation[];
   onDismiss: (id: string) => void;
   onSave: (id: string) => void;
+  onAddToList: (rec: Recommendation) => void;
 }) {
   return (
     <div>
@@ -318,6 +373,7 @@ function RecommendationSection({
             recommendation={rec}
             onDismiss={() => onDismiss(rec.id)}
             onSave={() => onSave(rec.id)}
+            onAddToList={() => onAddToList(rec)}
           />
         ))}
       </div>
@@ -329,10 +385,12 @@ function RecommendationCard({
   recommendation,
   onDismiss,
   onSave,
+  onAddToList,
 }: {
   recommendation: Recommendation;
   onDismiss: () => void;
   onSave: () => void;
+  onAddToList: () => void;
 }) {
   const priorityColors = {
     high: "bg-red-100 text-red-700 border-red-200",
@@ -461,6 +519,26 @@ function RecommendationCard({
             month: "short",
             day: "numeric",
           })}
+        </div>
+      )}
+
+      {/* Add to List Button - only show for schools/programs that are in our DB */}
+      {(recommendation.schoolId || recommendation.summerProgramId) && (
+        <div className="mt-4 pt-3 border-t border-border-subtle">
+          {recommendation.status === "acted_upon" ? (
+            <div className="flex items-center gap-2 text-sm text-green-600">
+              <Check className="w-4 h-4" />
+              Added to your list
+            </div>
+          ) : (
+            <button
+              onClick={onAddToList}
+              className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-accent-primary text-white rounded-xl text-sm font-medium hover:bg-accent-primary/90 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add to My {recommendation.category === "school" ? "Schools" : "Programs"}
+            </button>
+          )}
         </div>
       )}
     </div>

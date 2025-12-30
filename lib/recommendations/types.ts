@@ -46,6 +46,7 @@ export interface StudentProfileSnapshot {
 
   // Programs already on list
   existingSchoolIds: string[];
+  existingSchoolNames: string[];
   existingSummerProgramIds: string[];
 }
 

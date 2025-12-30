@@ -167,7 +167,12 @@ async function loadProfileSnapshot(
         orderBy: { displayOrder: "asc" },
       },
       aboutMe: true,
-      schoolList: { select: { schoolId: true } },
+      schoolList: {
+        select: {
+          schoolId: true,
+          school: { select: { name: true } }
+        }
+      },
       summerProgramList: { select: { summerProgramId: true } },
     },
   });
@@ -216,6 +221,7 @@ async function loadProfileSnapshot(
 
     // Existing list items
     existingSchoolIds: profile.schoolList.map((s) => s.schoolId),
+    existingSchoolNames: profile.schoolList.map((s) => s.school.name),
     existingSummerProgramIds: profile.summerProgramList.map(
       (p) => p.summerProgramId
     ),
