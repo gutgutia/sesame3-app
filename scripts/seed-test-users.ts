@@ -55,9 +55,7 @@ const TEST_USERS = [
         schoolReportedGpaWeighted: 4.2,
       },
       testing: {
-        satTotal: 1490,
-        satMath: 760,
-        satReading: 730,
+        satScores: [{ total: 1490, math: 760, reading: 730, testDate: new Date("2024-03-09") }],
       },
       activities: [
         {
@@ -117,10 +115,8 @@ const TEST_USERS = [
         classSize: 450,
       },
       testing: {
-        satTotal: 1560,
-        satMath: 800,
-        satReading: 760,
-        actComposite: 35,
+        satScores: [{ total: 1560, math: 800, reading: 760, testDate: new Date("2024-03-09") }],
+        actScores: [{ composite: 35, english: 35, math: 36, reading: 35, science: 34, testDate: new Date("2024-04-13") }],
       },
       activities: [
         {
@@ -278,15 +274,44 @@ async function seedTestUsers() {
 
       // Testing
       if (profileData.testing) {
-        await prisma.testing.create({
+        const testing = await prisma.testing.create({
           data: {
             studentProfileId: profile.id,
-            satTotal: profileData.testing.satTotal,
-            satMath: profileData.testing.satMath,
-            satReading: profileData.testing.satReading,
-            actComposite: profileData.testing.actComposite,
           },
         });
+
+        // Create SAT scores
+        if (profileData.testing.satScores) {
+          for (const sat of profileData.testing.satScores) {
+            await prisma.sATScore.create({
+              data: {
+                testingId: testing.id,
+                total: sat.total,
+                math: sat.math,
+                reading: sat.reading,
+                testDate: sat.testDate,
+              },
+            });
+          }
+        }
+
+        // Create ACT scores
+        if (profileData.testing.actScores) {
+          for (const act of profileData.testing.actScores) {
+            await prisma.aCTScore.create({
+              data: {
+                testingId: testing.id,
+                composite: act.composite,
+                english: act.english,
+                math: act.math,
+                reading: act.reading,
+                science: act.science,
+                testDate: act.testDate,
+              },
+            });
+          }
+        }
+
         console.log(`  📝 Added Testing`);
       }
 
@@ -303,7 +328,7 @@ async function seedTestUsers() {
               isLeadership: activity.isLeadership,
               description: activity.description,
               hoursPerWeek: activity.hoursPerWeek,
-              isSpike: activity.isSpike,
+              isSpike: (activity as { isSpike?: boolean }).isSpike,
               displayOrder: i,
             },
           });
