@@ -169,6 +169,7 @@ interface ProfileContextType {
   error: string | null;
   refreshProfile: (showLoading?: boolean) => Promise<void>;
   updateProfile: (updates: Partial<ProfileData>) => void;
+  clearProfile: () => void; // Clear profile state (for logout)
   // Optimistic update helpers
   toggleTask: (goalId: string, taskId: string, completed: boolean) => void;
   addTask: (goalId: string, task: NonNullable<NonNullable<ProfileData["goals"]>[number]["tasks"]>[number]) => void;
@@ -303,6 +304,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     setProfile(prev => prev ? { ...prev, ...updates } : null);
   }, []);
 
+  // Clear profile state (for logout)
+  const clearProfile = useCallback(() => {
+    setProfile(null);
+    setIsFullyLoaded(false);
+    setError(null);
+  }, []);
+
   // Optimistic task toggle
   const toggleTask = useCallback((goalId: string, taskId: string, completed: boolean) => {
     setProfile(prev => {
@@ -401,6 +409,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         error,
         refreshProfile,
         updateProfile,
+        clearProfile,
         toggleTask,
         addTask,
         addSubtask,
