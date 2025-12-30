@@ -783,8 +783,16 @@ model StudentSummerProgram {
   id                String @id @default(uuid())
   studentProfileId  String
   studentProfile    StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  summerProgramId   String
-  summerProgram     SummerProgram @relation(fields: [summerProgramId], references: [id], onDelete: Cascade)
+
+  // Linked program from our curated database (null for custom programs)
+  summerProgramId   String?
+  summerProgram     SummerProgram? @relation(fields: [summerProgramId], references: [id], onDelete: Cascade)
+
+  // Custom program fields (for programs not in our database)
+  isCustom          Boolean   @default(false)
+  customName        String?   // e.g., "Local Hospital Internship"
+  customOrganization String?  // e.g., "St. Mary's Hospital"
+  customDescription String?   @db.Text  // Brief description of the program
 
   // Which year they're tracking/applying for
   applicationYear   Int
@@ -815,6 +823,7 @@ model StudentSummerProgram {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
+  // Unique constraint for linked programs only
   @@unique([studentProfileId, summerProgramId, applicationYear])
   @@index([studentProfileId])
   @@index([status])
@@ -829,46 +838,54 @@ model StudentSchool {
   id               String @id @default(uuid())
   studentProfileId String
   studentProfile   StudentProfile @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
-  schoolId         String
-  school           School @relation(fields: [schoolId], references: [id])
-  
+
+  // Linked school from our curated database (null for custom schools)
+  schoolId         String?
+  school           School? @relation(fields: [schoolId], references: [id])
+
+  // Custom school fields (for schools not in our database)
+  isCustom         Boolean   @default(false)
+  customName       String?   // e.g., "XYZ University"
+  customLocation   String?   // e.g., "California"
+
   // Classification
   tier             String    // "reach" | "target" | "safety"
   isDream          Boolean   @default(false)  // Can be true for any tier
-  
+
   // Interest Level
   interestLevel    String?   // "high" | "medium" | "low" | "uncertain"
-  
+
   // Application Status
-  status           String    @default("researching")  
+  status           String    @default("researching")
   // "researching" | "planning" | "in_progress" | "submitted" | "accepted" | "rejected" | "waitlisted" | "deferred" | "withdrawn" | "committed"
-  
+
   // Application Type
   applicationType  String?   // "ed" | "ed2" | "ea" | "rea" | "rd"
-  
+
   // Decision
   decisionDate     DateTime?
   financialAidOffered Int?
-  
+
   // Student's Notes
   notes            String?
   whyInterested    String?   // Why this school
   concerns         String?   // Hesitations
-  
+
   // Calculated
   calculatedChance Float?    // Our calculated admission probability
   chanceUpdatedAt  DateTime?
-  
+
   // Display
   displayOrder     Int       @default(0)
-  
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
+  // Unique constraint for linked schools only (custom schools use different uniqueness)
   @@unique([studentProfileId, schoolId])
   @@index([studentProfileId])
   @@index([status])
-  
+
   // Relations - Rich notes (separate from simple 'notes' field above)
   richNotes SchoolNote[]
 }

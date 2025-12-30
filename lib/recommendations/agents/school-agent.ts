@@ -2,7 +2,8 @@
  * School Agent
  *
  * Generates school recommendations based on student profile.
- * Uses the LLM's existing knowledge of schools rather than loading extensive data.
+ * Loads all schools from our database and has the LLM pick from them.
+ * This ensures 100% linkage to our curated school data.
  */
 
 import { generateObject } from "ai";
@@ -11,10 +12,15 @@ import { modelFor } from "@/lib/ai/providers";
 import { prisma } from "@/lib/db";
 import type { RecommendationInput, GeneratedRecommendation } from "../types";
 
+interface SchoolOption {
+  id: string;
+  name: string;
+}
+
 const SchoolRecommendationSchema = z.object({
   recommendations: z.array(
     z.object({
-      name: z.string().describe("Full name of the school"),
+      schoolId: z.string().describe("The ID of the school from the provided list"),
       tier: z
         .enum(["reach", "target", "safety"])
         .describe("Classification based on student's profile"),
@@ -46,8 +52,21 @@ export async function generateSchoolRecommendations(
 ): Promise<GeneratedRecommendation[]> {
   const { profile, stage, preferences } = input;
 
-  // Build the prompt
-  const prompt = buildSchoolPrompt(profile, stage, preferences);
+  // Load all schools from database
+  const allSchools = await loadSchoolsFromDatabase();
+
+  // Filter out schools already on the student's list
+  const availableSchools = allSchools.filter(
+    (school) => !profile.existingSchoolIds.includes(school.id)
+  );
+
+  if (availableSchools.length === 0) {
+    console.log("No available schools to recommend (all are on list or DB is empty)");
+    return [];
+  }
+
+  // Build the prompt with the school list
+  const prompt = buildSchoolPrompt(profile, stage, preferences, availableSchools);
 
   try {
     const { object } = await generateObject({
@@ -56,22 +75,24 @@ export async function generateSchoolRecommendations(
       prompt,
     });
 
-    // Try to match school names to our database
-    const schoolNames = object.recommendations.map((rec) => rec.name);
-    const matchedSchools = await matchSchoolsToDatabase(schoolNames);
+    // Create a map for quick lookup
+    const schoolMap = new Map(allSchools.map((s) => [s.id, s.name]));
 
-    // Convert to GeneratedRecommendation format with schoolId if matched
-    return object.recommendations.map((rec) => ({
-      category: "school" as const,
-      title: rec.name,
-      subtitle: `${rec.tier.charAt(0).toUpperCase() + rec.tier.slice(1)} School`,
-      reasoning: rec.reasoning,
-      fitScore: rec.fitScore,
-      priority: rec.priority,
-      actionItems: rec.actionItems,
-      relevantGrade: stage.grade,
-      schoolId: matchedSchools.get(rec.name.toLowerCase()),
-    }));
+    // Convert to GeneratedRecommendation format
+    // Only include recommendations for schools that exist in our database
+    return object.recommendations
+      .filter((rec) => schoolMap.has(rec.schoolId))
+      .map((rec) => ({
+        category: "school" as const,
+        title: schoolMap.get(rec.schoolId)!,
+        subtitle: `${rec.tier.charAt(0).toUpperCase() + rec.tier.slice(1)} School`,
+        reasoning: rec.reasoning,
+        fitScore: rec.fitScore,
+        priority: rec.priority,
+        actionItems: rec.actionItems,
+        relevantGrade: stage.grade,
+        schoolId: rec.schoolId,
+      }));
   } catch (error) {
     console.error("Error generating school recommendations:", error);
     return [];
@@ -79,63 +100,25 @@ export async function generateSchoolRecommendations(
 }
 
 /**
- * Try to match school names to our database
- * Uses case-insensitive matching and common variations
+ * Load all schools from our database
  */
-async function matchSchoolsToDatabase(
-  schoolNames: string[]
-): Promise<Map<string, string>> {
-  const matchMap = new Map<string, string>();
-
-  // Get all schools that might match (using ILIKE for case-insensitive)
+async function loadSchoolsFromDatabase(): Promise<SchoolOption[]> {
   const schools = await prisma.school.findMany({
-    where: {
-      OR: schoolNames.map((name) => ({
-        name: { contains: name.split(" ")[0], mode: "insensitive" as const },
-      })),
+    select: {
+      id: true,
+      name: true,
     },
-    select: { id: true, name: true },
+    orderBy: { name: "asc" },
   });
 
-  // Create a map for quick lookup
-  const dbSchoolMap = new Map(
-    schools.map((s) => [s.name.toLowerCase(), s.id])
-  );
-
-  // Try to match each recommended school
-  for (const name of schoolNames) {
-    const lowerName = name.toLowerCase();
-
-    // Exact match
-    if (dbSchoolMap.has(lowerName)) {
-      matchMap.set(lowerName, dbSchoolMap.get(lowerName)!);
-      continue;
-    }
-
-    // Try common variations
-    const variations = [
-      lowerName,
-      lowerName.replace(" university", ""),
-      lowerName.replace("university of ", ""),
-      lowerName + " university",
-      "university of " + lowerName,
-    ];
-
-    for (const variation of variations) {
-      if (dbSchoolMap.has(variation)) {
-        matchMap.set(lowerName, dbSchoolMap.get(variation)!);
-        break;
-      }
-    }
-  }
-
-  return matchMap;
+  return schools;
 }
 
 function buildSchoolPrompt(
   profile: RecommendationInput["profile"],
   stage: RecommendationInput["stage"],
-  preferences: RecommendationInput["preferences"]
+  preferences: RecommendationInput["preferences"],
+  availableSchools: SchoolOption[]
 ): string {
   const parts: string[] = [];
 
@@ -233,34 +216,35 @@ function buildSchoolPrompt(
     }
   }
 
-  // Schools already on list - IMPORTANT: list actual names so LLM doesn't recommend duplicates
-  if (profile.existingSchoolNames.length > 0) {
-    parts.push("");
-    parts.push("### Schools Already on List (DO NOT RECOMMEND THESE)");
-    profile.existingSchoolNames.forEach((name) => {
-      parts.push(`- ${name}`);
-    });
-    parts.push("");
-    parts.push("Focus on schools that would complement their existing choices. Do not recommend any school listed above.");
-  }
-
   // Current stage context
   parts.push("");
   parts.push("### Current Stage");
   parts.push(`The student is a ${stage.grade} in ${stage.season}. ${stage.description}`);
   parts.push(`Current priorities: ${stage.priorities.join(", ")}`);
 
+  // Available schools from our database
+  parts.push("");
+  parts.push("## Available Schools");
+  parts.push("");
+  parts.push("You MUST only recommend schools from the following list. Each school has an ID that you must return.");
+  parts.push("");
+  availableSchools.forEach((school) => {
+    parts.push(`- ${school.name} (ID: ${school.id})`);
+  });
+
   // Instructions
   parts.push("");
   parts.push("## Instructions");
   parts.push("");
-  parts.push("Based on this profile, recommend 5-8 colleges that would be good fits. Include a mix of:");
+  parts.push("Based on this profile, recommend 5-8 colleges from the list above. Include a mix of:");
   parts.push("- 2-3 Reach schools (acceptance rate significantly below what their stats suggest)");
   parts.push("- 2-3 Target schools (realistic chances based on their profile)");
   parts.push("- 1-2 Safety schools (very likely to be admitted)");
   parts.push("");
+  parts.push("IMPORTANT: You must use the exact school IDs from the list above. Do not make up IDs.");
+  parts.push("");
   parts.push("For each school, explain why it's a good fit considering their academics, interests, and preferences.");
-  parts.push("Use your knowledge of colleges - you don't need to list specific statistics, just explain the fit.");
+  parts.push("Use your knowledge of these colleges to assess fit - you don't need to list specific statistics.");
 
   return parts.join("\n");
 }

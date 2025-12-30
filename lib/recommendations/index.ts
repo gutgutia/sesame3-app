@@ -219,12 +219,16 @@ async function loadProfileSnapshot(
     values: profile.aboutMe?.values ?? [],
     aspirations: profile.aboutMe?.aspirations ?? null,
 
-    // Existing list items
-    existingSchoolIds: profile.schoolList.map((s) => s.schoolId),
-    existingSchoolNames: profile.schoolList.map((s) => s.school.name),
-    existingSummerProgramIds: profile.summerProgramList.map(
-      (p) => p.summerProgramId
-    ),
+    // Existing list items (filter to only linked schools/programs)
+    existingSchoolIds: profile.schoolList
+      .filter((s) => s.schoolId)
+      .map((s) => s.schoolId as string),
+    existingSchoolNames: profile.schoolList
+      .filter((s) => s.school)
+      .map((s) => s.school!.name),
+    existingSummerProgramIds: profile.summerProgramList
+      .filter((p) => p.summerProgramId)
+      .map((p) => p.summerProgramId as string),
   };
 }
 

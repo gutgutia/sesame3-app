@@ -140,7 +140,7 @@ export default function RecommendationsPage() {
     try {
       if (rec.category === "school" && rec.schoolId) {
         // Add school to student's list
-        const res = await fetch("/api/schools/list", {
+        const res = await fetch("/api/profile/schools", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -155,12 +155,11 @@ export default function RecommendationsPage() {
         if (!res.ok) throw new Error("Failed to add school");
       } else if (rec.category === "program" && rec.summerProgramId) {
         // Add program to student's list
-        const res = await fetch("/api/programs/list", {
+        const res = await fetch("/api/opportunities/summer-programs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             summerProgramId: rec.summerProgramId,
-            applicationYear: new Date().getFullYear() + 1,
           }),
         });
         if (!res.ok) throw new Error("Failed to add program");
