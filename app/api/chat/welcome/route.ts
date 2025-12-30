@@ -41,8 +41,19 @@ const FALLBACK_MESSAGES: Record<string, string> = {
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
+  // Parse request body ONCE and save mode for fallback
+  // (can't re-read request body in catch block after it's consumed)
+  let mode = "general";
+  let conversationId: string | undefined;
+  let saveOnly: boolean | undefined;
+  let providedMessage: string | undefined;
+
   try {
-    const { mode = "general", conversationId, saveOnly, message: providedMessage } = await request.json();
+    const body = await request.json();
+    mode = body.mode || "general";
+    conversationId = body.conversationId;
+    saveOnly = body.saveOnly;
+    providedMessage = body.message;
 
     // If saveOnly mode, just save the provided message to DB
     if (saveOnly && conversationId && providedMessage) {
@@ -216,16 +227,10 @@ Rules:
     
   } catch (error) {
     console.error("Welcome message error:", error);
-    // Try to get mode from request for fallback, default to general
-    let fallbackMode = "general";
-    try {
-      const body = await request.clone().json();
-      fallbackMode = body.mode || "general";
-    } catch {
-      // Ignore parse errors, use general
-    }
+    // Use mode that was saved before any errors could occur
+    console.log(`[Welcome] Error occurred, using ${mode} fallback`);
     return NextResponse.json({
-      message: FALLBACK_MESSAGES[fallbackMode] || FALLBACK_MESSAGES.general,
+      message: FALLBACK_MESSAGES[mode] || FALLBACK_MESSAGES.general,
     });
   }
 }
