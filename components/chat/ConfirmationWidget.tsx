@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   Check, X, PenTool, Trophy, Users,
   Upload, FlaskConical, School, Target, User,
@@ -1121,15 +1121,56 @@ function SchoolConfirmWidget({
   const [step, setStep] = useState<"tier" | "deadlines" | "success">("tier");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingDeadlines, setIsLoadingDeadlines] = useState(false);
+  const [isLookingUp, setIsLookingUp] = useState(true);
   const [availableDeadlines, setAvailableDeadlines] = useState<SchoolDeadline[]>([]);
   const [selectedDeadlines, setSelectedDeadlines] = useState<Set<string>>(new Set());
   const [includeActions, setIncludeActions] = useState(true); // Include action templates by default
   const [actionTemplates, setActionTemplates] = useState<Array<{ title: string; daysOffset: number; category: string }>>([]);
   const [createdTasks, setCreatedTasks] = useState<Array<{ title: string; dueDate: string | null }>>([]);
+  const [lookedUpSchool, setLookedUpSchool] = useState<{ id: string; name: string; location?: string } | null>(null);
 
   const schoolName = (data.name as string) || (data.schoolName as string) || "Unknown School";
-  const schoolId = data.schoolId as string;
-  const location = data.location as string;
+  const schoolId = lookedUpSchool?.id || (data.schoolId as string);
+  const location = lookedUpSchool?.location || (data.location as string);
+
+  // Look up school by name on mount
+  useEffect(() => {
+    const lookupSchool = async () => {
+      if (data.schoolId) {
+        // Already have schoolId, no need to look up
+        setIsLookingUp(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/schools/search?q=${encodeURIComponent(schoolName)}&limit=1`);
+        if (response.ok) {
+          const result = await response.json();
+          if (result.schools && result.schools.length > 0) {
+            const school = result.schools[0];
+            // Check if it's a close match (case-insensitive)
+            if (school.name.toLowerCase() === schoolName.toLowerCase() ||
+                school.name.toLowerCase().includes(schoolName.toLowerCase()) ||
+                schoolName.toLowerCase().includes(school.name.toLowerCase())) {
+              setLookedUpSchool({
+                id: school.id,
+                name: school.name,
+                location: school.city && school.state ? `${school.city}, ${school.state}` : undefined,
+              });
+              // Update form data with schoolId so it's included when confirming
+              onChange("schoolId", school.id);
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to lookup school:", error);
+      } finally {
+        setIsLookingUp(false);
+      }
+    };
+
+    lookupSchool();
+  }, [schoolName, data.schoolId, onChange]);
 
   const hasSchoolIdentifier = !!schoolId || !!(data.name || data.schoolName);
   const canSubmitTier = !!data.tier && hasSchoolIdentifier;
@@ -1418,16 +1459,27 @@ function SchoolConfirmWidget({
       </div>
 
       <div className="bg-white rounded-lg p-3 mb-3 border border-border-subtle">
-        <div className="font-semibold text-text-main">{schoolName}</div>
+        <div className="font-semibold text-text-main">
+          {lookedUpSchool?.name || schoolName}
+        </div>
         {location && <div className="text-xs text-text-muted mt-0.5">{location}</div>}
-        {isUnknownSchool && (
+        {isLookingUp ? (
+          <div className="flex items-center gap-1 mt-2 text-xs text-text-muted">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            Looking up school...
+          </div>
+        ) : isUnknownSchool ? (
           <span className="inline-block mt-2 text-[10px] px-2 py-0.5 bg-amber-50 text-amber-600 rounded-full">
             Not in database
+          </span>
+        ) : (
+          <span className="inline-block mt-2 text-[10px] px-2 py-0.5 bg-green-50 text-green-600 rounded-full">
+            Found in database
           </span>
         )}
       </div>
 
-      {isUnknownSchool && (
+      {!isLookingUp && isUnknownSchool && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 mb-3 text-xs text-amber-700">
           We don&apos;t have this school in our database yet. We&apos;ll add it to your list and send a request to add it with full admission data.
         </div>
@@ -1461,10 +1513,10 @@ function SchoolConfirmWidget({
       <div className="flex gap-2">
         <button
           onClick={handleTierNext}
-          disabled={!canSubmitTier || isSubmitting}
+          disabled={!canSubmitTier || isSubmitting || isLookingUp}
           className="flex-1 bg-accent-primary text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-accent-hover transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
         >
-          {isSubmitting ? (
+          {isSubmitting || isLookingUp ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : isUnknownSchool ? (
             <>

@@ -700,6 +700,27 @@ function normalizeWidgetDataForApi(widgetType: WidgetType, data: Record<string, 
     };
   }
 
+  // School widget - API expects schoolId (for known) or customName (for unknown)
+  if (widgetType === "school") {
+    if (data.schoolId) {
+      // Known school - use schoolId
+      return {
+        schoolId: data.schoolId,
+        tier: data.tier,
+        isDream: data.tier === "dream",
+        whyInterested: data.whyInterested,
+      };
+    } else {
+      // Unknown school - use customName
+      return {
+        customName: data.name || data.schoolName,
+        tier: data.tier,
+        isDream: data.tier === "dream",
+        whyInterested: data.whyInterested,
+      };
+    }
+  }
+
   // For other widget types, return data as-is
   return data;
 }
