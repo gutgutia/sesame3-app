@@ -1,4 +1,5 @@
 import { AppLayout } from "@/components/layout/AppLayout";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 
 export default function MainLayout({
   children,
@@ -6,6 +7,10 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <AppLayout>{children}</AppLayout>
+    <AppLayout>
+      <ErrorBoundary>
+        {children}
+      </ErrorBoundary>
+    </AppLayout>
   );
 }
