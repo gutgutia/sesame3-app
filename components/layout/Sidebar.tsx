@@ -70,7 +70,7 @@ const navItems: NavItem[] = [
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { profile } = useProfile();
+  const { profile, clearProfile } = useProfile();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -127,6 +127,8 @@ export function Sidebar() {
   // Handle logout
   const handleLogout = async () => {
     try {
+      // Clear profile state first to prevent stale data on re-login
+      clearProfile();
       await fetch("/api/auth/logout", { method: "POST" });
       router.push("/login");
       router.refresh();
