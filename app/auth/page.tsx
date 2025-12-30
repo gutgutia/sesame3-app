@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, Suspense } from "react";
 import { ArrowRight, Mail, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AuthPage() {
   return (
@@ -30,13 +31,54 @@ function AuthPageContent() {
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"start" | "code">("start");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
 
   // DEV: Show code in console for testing
   const [devCode, setDevCode] = useState<string | null>(null);
 
+  const handleGoogleSignIn = async () => {
+    if (isGoogleLoading || isLoading) return;
+
+    setIsGoogleLoading(true);
+    setError(null);
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+      // The redirect will happen automatically
+    } catch (err) {
+      console.error("[Auth] Google sign-in error:", err);
+      setError(err instanceof Error ? err.message : "Failed to sign in with Google");
+      setIsGoogleLoading(false);
+    }
+  };
+
   const codeInputRef = useRef<HTMLInputElement>(null);
+
+  // Check for OAuth errors from callback redirect
+  useEffect(() => {
+    const oauthError = searchParams.get("error");
+    if (oauthError) {
+      const errorMessages: Record<string, string> = {
+        no_code: "Authentication was cancelled. Please try again.",
+        auth_failed: "Failed to sign in with Google. Please try again.",
+        no_user: "Could not retrieve your account information. Please try again.",
+        unexpected: "An unexpected error occurred. Please try again.",
+      };
+      setError(errorMessages[oauthError] || "Authentication failed. Please try again.");
+    }
+  }, [searchParams]);
 
   // Focus code input when step changes to code
   useEffect(() => {
@@ -186,13 +228,21 @@ function AuthPageContent() {
                 </p>
               </div>
 
-              <button className="w-full flex items-center justify-center gap-3 bg-white border border-border-medium hover:bg-bg-sidebar py-3.5 rounded-xl font-medium text-text-main transition-colors mb-6 shadow-sm hover:shadow-md">
-                <img
-                  src="https://www.svgrepo.com/show/475656/google-color.svg"
-                  className="w-5 h-5"
-                  alt="Google"
-                />
-                Continue with Google
+              <button
+                onClick={handleGoogleSignIn}
+                disabled={isGoogleLoading || isLoading}
+                className="w-full flex items-center justify-center gap-3 bg-white border border-border-medium hover:bg-bg-sidebar py-3.5 rounded-xl font-medium text-text-main transition-colors mb-6 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGoogleLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <img
+                    src="https://www.svgrepo.com/show/475656/google-color.svg"
+                    className="w-5 h-5"
+                    alt="Google"
+                  />
+                )}
+                {isGoogleLoading ? "Connecting..." : "Continue with Google"}
               </button>
 
               <div className="flex items-center gap-4 mb-6">
