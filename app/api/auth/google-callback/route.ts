@@ -1,9 +1,8 @@
 /**
- * GET /auth/callback
+ * POST /api/auth/google-callback
  *
- * Handles the OAuth callback from Supabase (Google auth).
- * Exchanges the auth code for a session, creates/updates the user,
- * and sets session cookies.
+ * Handles the Google OAuth callback from the client-side.
+ * Creates/updates the user and sets session cookies.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,33 +12,36 @@ import { sendEmail } from "@/lib/email/resend";
 import { WelcomeEmail } from "@/lib/email/templates";
 import { cookies } from "next/headers";
 
-export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const code = requestUrl.searchParams.get("code");
-  const redirectParam = requestUrl.searchParams.get("redirect") || "/";
-  const origin = requestUrl.origin;
-
-  if (!code) {
-    console.error("[Auth Callback] No code provided");
-    return NextResponse.redirect(`${origin}/auth?error=no_code`);
-  }
-
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const body = await request.json();
+    const { accessToken, redirect = "/" } = body;
 
-    // Exchange the code for a session
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-
-    if (error) {
-      console.error("[Auth Callback] Error exchanging code:", error);
-      return NextResponse.redirect(`${origin}/auth?error=auth_failed`);
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: "Access token is required" },
+        { status: 400 }
+      );
     }
 
-    const { user: supabaseUser, session } = data;
+    // Create Supabase client and get user from the access token
+    const supabase = await createClient();
+    const { data: { user: supabaseUser }, error: userError } = await supabase.auth.getUser(accessToken);
 
-    if (!supabaseUser || !supabaseUser.email) {
-      console.error("[Auth Callback] No user or email in session");
-      return NextResponse.redirect(`${origin}/auth?error=no_user`);
+    if (userError || !supabaseUser) {
+      console.error("[Google Callback] Error getting user:", userError);
+      return NextResponse.json(
+        { error: "Invalid access token" },
+        { status: 401 }
+      );
+    }
+
+    if (!supabaseUser.email) {
+      console.error("[Google Callback] No email in user data");
+      return NextResponse.json(
+        { error: "No email associated with account" },
+        { status: 400 }
+      );
     }
 
     const normalizedEmail = supabaseUser.email.toLowerCase().trim();
@@ -71,7 +73,7 @@ export async function GET(request: NextRequest) {
         react: WelcomeEmail({}),
         text: "Welcome to Sesame3! We're excited to help you on your college prep journey.",
       }).catch((err) => {
-        console.error("[Auth Callback] Failed to send welcome email:", err);
+        console.error("[Google Callback] Failed to send welcome email:", err);
       });
     } else {
       // Update existing user
@@ -79,16 +81,16 @@ export async function GET(request: NextRequest) {
         where: { id: user.id },
         data: {
           lastLoginAt: new Date(),
-          // Update name/avatar if they were previously null (migrating from email-only)
+          // Update name/avatar if they were previously null
           ...(user.name ? {} : { name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name }),
           ...(user.avatarUrl ? {} : { avatarUrl: supabaseUser.user_metadata?.avatar_url || supabaseUser.user_metadata?.picture }),
-          // Update authProvider if it was email before (user linked account)
+          // Update authProvider if it was email before
           ...(user.authProvider === "email" ? { authProvider: "google" } : {}),
         },
       });
     }
 
-    // Set our custom session cookies (same as email auth)
+    // Set our custom session cookies
     const cookieStore = await cookies();
 
     const sessionToken = Buffer.from(
@@ -156,7 +158,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Determine redirect
-    let redirectTo = redirectParam;
+    let redirectTo = redirect;
     if (isNewUser) {
       // Check if user has any access grants (was invited)
       const hasAccessGrants = await prisma.accessGrant.findFirst({
@@ -172,9 +174,20 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return NextResponse.redirect(`${origin}${redirectTo}`);
+    return NextResponse.json({
+      success: true,
+      isNewUser,
+      user: {
+        id: user.id,
+        email: user.email,
+      },
+      redirectTo,
+    });
   } catch (error) {
-    console.error("[Auth Callback] Unexpected error:", error);
-    return NextResponse.redirect(`${origin}/auth?error=unexpected`);
+    console.error("[Google Callback] Unexpected error:", error);
+    return NextResponse.json(
+      { error: "Failed to complete authentication" },
+      { status: 500 }
+    );
   }
 }
