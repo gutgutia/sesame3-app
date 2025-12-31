@@ -290,6 +290,13 @@ export async function POST(request: NextRequest) {
             messages: validMessages,
             tools: allTools,
             onFinish: async ({ text, toolCalls, toolResults, usage }) => {
+              // Log Claude's response
+              console.log(`[Chat] Claude response complete (${text.length} chars)`);
+              console.log(`[Chat] Claude response preview: "${text.substring(0, 100)}..."`);
+              if (toolCalls && toolCalls.length > 0) {
+                console.log(`[Chat] Claude tool calls: ${toolCalls.map(t => t.name).join(", ")}`);
+              }
+
               // Estimate output tokens
               totalOutputTokens = usage?.outputTokens || Math.ceil(text.length / 4);
               const actualInputTokens = usage?.inputTokens || estimatedInputTokens;

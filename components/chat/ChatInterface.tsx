@@ -243,6 +243,9 @@ export function ChatInterface({
       
       setMessages(prev => [...prev, assistantMessage]);
       
+      // Track widgets collected across all chunks
+      const collectedWidgets: PendingWidget[] = [];
+
       // Read the stream - handle both SSE events and plain text
       while (true) {
         const { done, value } = await reader.read();
@@ -251,49 +254,68 @@ export function ChatInterface({
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
 
-        // Extract ALL widget events from buffer (supports multiple widgets)
-        const widgetRegex = /event: widget\ndata: (.+?)(\n\n|$)/g;
-        let match;
-        const newWidgets: PendingWidget[] = [];
+        // Split buffer into SSE events (separated by double newlines)
+        // Process complete events, keep incomplete ones in buffer
+        const parts = buffer.split("\n\n");
 
-        while ((match = widgetRegex.exec(buffer)) !== null) {
-          try {
-            const eventData = JSON.parse(match[1]);
-            if (eventData.type === "widget" && eventData.widget) {
-              // Normalize widget data (parser uses satTotal/satMath/satReading, API uses total/math/reading)
-              const normalizedData = normalizeWidgetData(eventData.widget.type, eventData.widget.data);
-              const widget: PendingWidget = {
-                id: `widget-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-                type: eventData.widget.type as WidgetType,
-                data: normalizedData,
-                status: "pending",
-              };
-              newWidgets.push(widget);
+        // Last part might be incomplete, keep it in buffer
+        buffer = parts.pop() || "";
+
+        // Process complete SSE events
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (!trimmed) continue;
+
+          // Check if this is a widget event
+          const widgetMatch = trimmed.match(/^event: widget\ndata: (.+)$/s);
+          if (widgetMatch) {
+            try {
+              const eventData = JSON.parse(widgetMatch[1]);
+              if (eventData.type === "widget" && eventData.widget) {
+                // Normalize widget data (parser uses satTotal/satMath/satReading, API uses total/math/reading)
+                const normalizedData = normalizeWidgetData(eventData.widget.type, eventData.widget.data);
+                const widget: PendingWidget = {
+                  id: `widget-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+                  type: eventData.widget.type as WidgetType,
+                  data: normalizedData,
+                  status: "pending",
+                };
+                collectedWidgets.push(widget);
+                console.log("[Chat] Parsed widget:", widget.type, widget.id, widget.data);
+              }
+            } catch (e) {
+              console.error("[Chat] Failed to parse widget event:", e, widgetMatch[1]);
             }
-          } catch (e) {
-            console.error("[Chat] Failed to parse widget event:", e);
+          } else {
+            // Not a widget event - treat as text content
+            fullText += trimmed;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantMessage.id
+                  ? { ...m, content: fullText }
+                  : m
+              )
+            );
           }
         }
+      }
 
-        // Add all new widgets at once
-        if (newWidgets.length > 0) {
-          setPendingWidgets(prev => [...prev, ...newWidgets]);
-        }
+      // Process any remaining buffer content as text
+      if (buffer.trim()) {
+        fullText += buffer.trim();
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantMessage.id
+              ? { ...m, content: fullText }
+              : m
+          )
+        );
+      }
 
-        // Remove all SSE widget events from buffer, keep the rest as text
-        buffer = buffer.replace(/event: widget\ndata: .+?(\n\n|$)/g, "");
-
-        // Everything else is text content
-        if (buffer) {
-          fullText = buffer;
-          setMessages(prev =>
-            prev.map(m =>
-              m.id === assistantMessage.id
-                ? { ...m, content: fullText }
-                : m
-            )
-          );
-        }
+      // Add all collected widgets to state at once (after stream ends)
+      if (collectedWidgets.length > 0) {
+        console.log("[Chat] Adding", collectedWidgets.length, "widgets to state:", collectedWidgets.map(w => w.type));
+        setPendingWidgets(prev => [...prev, ...collectedWidgets]);
       }
       
       // Fallback for empty response
