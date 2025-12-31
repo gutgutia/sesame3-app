@@ -168,15 +168,22 @@ export async function POST(request: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         try {
+          // Determine if secretary will handle (auto-save) or if we need user confirmation
+          const secretaryWillHandle = secretaryResult?.canHandle && secretaryResult.response;
+
           // Send widget data IMMEDIATELY after parsing (before context assembly)
           // This ensures widgets appear in ~600ms, not 3+ seconds
+          // NOTE: If secretary handles, widgets are sent as "saved" (server executes tools)
+          //       If escalating to Claude, widgets are sent as "pending" (need user confirmation)
           if (featureFlags.enableWidgets && parserResult?.widgets && parserResult.widgets.length > 0) {
-            console.log(`[Chat] Sending ${parserResult.widgets.length} widget(s) immediately`);
+            console.log(`[Chat] Sending ${parserResult.widgets.length} widget(s) immediately (saved: ${secretaryWillHandle})`);
             for (const widget of parserResult.widgets) {
               console.log(`[Chat] Widget: type=${widget.type}, data=${JSON.stringify(widget.data || {})}`);
               const widgetEvent = JSON.stringify({
                 type: "widget",
                 widget: widget,
+                // Mark as already saved if secretary is handling (server executes tools)
+                saved: secretaryWillHandle,
               });
               const sseMessage = `event: widget\ndata: ${widgetEvent}\n\n`;
               controller.enqueue(encoder.encode(sseMessage));
@@ -186,6 +193,7 @@ export async function POST(request: NextRequest) {
             const widgetEvent = JSON.stringify({
               type: "widget",
               widget: parserResult.widget,
+              saved: secretaryWillHandle,
             });
             const sseMessage = `event: widget\ndata: ${widgetEvent}\n\n`;
             controller.enqueue(encoder.encode(sseMessage));
