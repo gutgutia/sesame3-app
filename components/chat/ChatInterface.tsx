@@ -343,8 +343,8 @@ export function ChatInterface({
     }
   }, [initialMessage, sendMessage]);
   
-  // Get current pending widget (show one at a time)
-  const currentWidget = pendingWidgets.find(w => w.status === "pending");
+  // Get ALL pending widgets (show multiple at once)
+  const currentWidgets = pendingWidgets.filter(w => w.status === "pending");
   
   // Handle widget confirmation
   const handleWidgetConfirm = async (widgetId: string, data: Record<string, unknown>) => {
@@ -461,11 +461,14 @@ export function ChatInterface({
     );
   };
   
+  // Check if input should be blocked (non-recommendation widgets are pending)
+  const hasBlockingWidgets = currentWidgets.some(w => !isRecommendationWidget(w.type));
+
   // Handle form submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || currentWidget) return;
-    
+    if (!input.trim() || isLoading || hasBlockingWidgets) return;
+
     sendMessage(input.trim());
     setInput("");
   };
@@ -526,38 +529,40 @@ export function ChatInterface({
           </div>
         )}
         
-        {/* Current pending widget */}
-        {currentWidget && !isLoading && (
-          <div className="flex justify-start">
-            {isRecommendationWidget(currentWidget.type) ? (
-              // Recommendation widgets use full width for better carousel display
-              <div className="w-full max-w-3xl">
-                <RecommendationCarousel
-                  type={currentWidget.type as "program_recommendations" | "school_recommendations"}
-                  data={currentWidget.data as { focusArea?: string; tier?: string; schools?: string[]; programs?: string[] }}
-                  onAddToList={() => {
-                    // Optionally track adds
-                    onProfileUpdate?.();
-                  }}
-                  onDismiss={() => handleWidgetDismiss(currentWidget.id)}
-                />
-              </div>
-            ) : (
-              // Regular confirmation widgets are narrower
-              <div className="max-w-md w-full">
-                <ConfirmationWidget
-                  type={currentWidget.type}
-                  data={currentWidget.data}
-                  onConfirm={(data) => handleWidgetConfirm(currentWidget.id, data)}
-                  onDismiss={() => handleWidgetDismiss(currentWidget.id)}
-                />
-              </div>
-            )}
+        {/* Pending widgets - show multiple side by side */}
+        {currentWidgets.length > 0 && !isLoading && (
+          <div className="flex flex-wrap gap-3 justify-start">
+            {currentWidgets.map((widget) => (
+              isRecommendationWidget(widget.type) ? (
+                // Recommendation widgets use full width for better carousel display
+                <div key={widget.id} className="w-full max-w-3xl">
+                  <RecommendationCarousel
+                    type={widget.type as "program_recommendations" | "school_recommendations"}
+                    data={widget.data as { focusArea?: string; tier?: string; schools?: string[]; programs?: string[] }}
+                    onAddToList={() => {
+                      // Optionally track adds
+                      onProfileUpdate?.();
+                    }}
+                    onDismiss={() => handleWidgetDismiss(widget.id)}
+                  />
+                </div>
+              ) : (
+                // Regular confirmation widgets - compact side by side
+                <div key={widget.id} className="w-full sm:w-auto sm:min-w-[280px] sm:max-w-[320px]">
+                  <ConfirmationWidget
+                    type={widget.type}
+                    data={widget.data}
+                    onConfirm={(data) => handleWidgetConfirm(widget.id, data)}
+                    onDismiss={() => handleWidgetDismiss(widget.id)}
+                  />
+                </div>
+              )
+            ))}
           </div>
         )}
         
         {/* Confirmed widgets indicator */}
-        {pendingWidgets.filter(w => w.status === "confirmed").length > 0 && !currentWidget && (
+        {pendingWidgets.filter(w => w.status === "confirmed").length > 0 && currentWidgets.length === 0 && (
           <div className="flex justify-start">
             <div className="bg-success-bg border border-[#BBF7D0] rounded-xl px-4 py-2 text-sm text-success-text flex items-center gap-2">
               <span>✓</span>
@@ -579,12 +584,12 @@ export function ChatInterface({
             onChange={(e) => setInput(e.target.value)}
             placeholder="What's on your mind?"
             className="w-full bg-bg-sidebar border border-border-medium rounded-xl pl-5 pr-14 py-4 text-[15px] focus:outline-none focus:border-accent-primary focus:ring-4 focus:ring-accent-surface transition-all"
-            disabled={isLoading || (!!currentWidget && !isRecommendationWidget(currentWidget.type))}
+            disabled={isLoading || hasBlockingWidgets}
             autoFocus
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading || (!!currentWidget && !isRecommendationWidget(currentWidget.type))}
+            disabled={!input.trim() || isLoading || hasBlockingWidgets}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-text-main text-white rounded-lg hover:bg-black/80 disabled:opacity-40 transition-colors"
           >
             <Send className="w-4 h-4" />
