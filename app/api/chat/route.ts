@@ -6,6 +6,7 @@ import {
   allTools,
   assembleContext,
   parseUserMessage,
+  callSecretary,
   shouldParse,
   formatParserContextForAdvisor,
   getAdvisorForTier,
@@ -13,8 +14,10 @@ import {
   getTierModelType,
   isRecommendationTool,
   getWidgetTypeFromToolName,
+  executeToolCall,
   type EntryMode,
   type ParserResponse,
+  type SecretaryResponse,
   type SubscriptionTier,
 } from "@/lib/ai";
 import {
@@ -23,6 +26,7 @@ import {
   getUserIdFromProfile,
 } from "@/lib/usage";
 import { getFeatureFlags } from "@/lib/config";
+import { getCachedContext, setCachedContext } from "@/lib/cache/context-cache";
 
 export const maxDuration = 60; // Allow up to 60 seconds for streaming
 
@@ -91,64 +95,94 @@ export async function POST(request: NextRequest) {
     const isUserMessage = lastMessage?.role === "user";
     const userInput = isUserMessage ? lastMessage.content : "";
     
-    // === PHASE 1: Fast Parsing with Kimi K2 ===
+    // === PHASE 1: Fast Parsing with Kimi K2 + Feature Flags (parallel) ===
+    const parseStart = Date.now();
+
+    // Get student profile for context (needed for secretary model)
+    const studentProfile = await prisma.studentProfile.findUnique({
+      where: { id: profileId },
+      select: { firstName: true, grade: true },
+    });
+
+    // Start feature flags fetch
+    const featureFlags = await getFeatureFlags();
+
+    // Prepare conversation history for secretary model
+    const conversationHistory = validMessages.map((m: { role: string; content: string }) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+
+    // Call secretary model or legacy parser based on feature flag
+    let secretaryResult: SecretaryResponse | null = null;
     let parserResult: ParserResponse | null = null;
-    let parserTokens = { input: 0, output: 0 };
-    
-    if (isUserMessage && shouldParse(userInput)) {
-      console.log("[Chat] Parsing user message...");
-      const parseStart = Date.now();
-      
-      parserResult = await parseUserMessage(userInput, {
+
+    if (featureFlags.enableSecretaryModel && isUserMessage) {
+      // NEW: Secretary model handles routing decision
+      secretaryResult = await callSecretary(userInput, {
+        studentName: studentProfile?.firstName,
+        grade: studentProfile?.grade || undefined,
         entryMode: mode,
+        conversationHistory: conversationHistory.slice(0, -1), // Exclude current message (it's in userInput)
       });
-      
-      // Estimate parser tokens (rough estimate: 4 chars = 1 token)
-      parserTokens = {
-        input: Math.ceil(userInput.length / 4) + 100, // +100 for system prompt
-        output: 50, // Parser output is small
-      };
-      
+      console.log(`\n========== CHAT REQUEST ==========`);
+      console.log(`[Chat] Mode: ${mode}`);
+      console.log(`[Chat] User: "${userInput.substring(0, 100)}${userInput.length > 100 ? '...' : ''}"`);
+      console.log(`[Chat] Secretary completed in ${Date.now() - parseStart}ms`);
+      console.log(`[Chat] Can Handle: ${secretaryResult.canHandle}`);
+      console.log(`[Chat] Widgets: ${secretaryResult.widgets?.length || 0}`, secretaryResult.widgets?.map(w => w.type) || []);
+      console.log(`[Chat] Tools: ${secretaryResult.tools?.length || 0}`, secretaryResult.tools?.map(t => t.name) || []);
+      if (!secretaryResult.canHandle) {
+        console.log(`[Chat] Escalation Reason: ${secretaryResult.escalationReason || 'not specified'}`);
+      }
+    } else if (isUserMessage && shouldParse(userInput, mode)) {
+      // LEGACY: Stateless parser (fallback)
+      parserResult = await parseUserMessage(userInput, { entryMode: mode });
+      console.log(`\n========== CHAT REQUEST (LEGACY PARSER) ==========`);
       console.log(`[Chat] Parser completed in ${Date.now() - parseStart}ms`);
     }
-    
-    // === PHASE 2: Assemble Context for Advisor ===
-    const context = await assembleContext({
-      profileId,
-      mode: mode as EntryMode,
-      messages: validMessages.map((m: { role: string; content: string }) => ({
-        role: m.role as "user" | "assistant",
-        content: m.content,
-      })),
-      sessionStartTime: new Date(),
-    });
-    
-    // Inject parser context into the system prompt
-    let advisorPrompt = context.advisorPrompt;
-    if (parserResult) {
-      const parserContext = formatParserContextForAdvisor(parserResult);
-      if (parserContext) {
-        advisorPrompt += `\n\n## Parser Analysis\n${parserContext}`;
-      }
+
+    // Merge secretary result into parser result for compatibility
+    // (widgets, tools, entities are the same structure)
+    if (secretaryResult) {
+      parserResult = {
+        entities: secretaryResult.entities,
+        intents: secretaryResult.intents,
+        tools: secretaryResult.tools,
+        widgets: secretaryResult.widgets,
+        widget: secretaryResult.widget,
+        acknowledgment: secretaryResult.acknowledgment,
+        questions: secretaryResult.questions,
+        confidence: secretaryResult.confidence,
+      };
     }
-    
-    // Estimate input tokens for advisor
-    const estimatedInputTokens = Math.ceil(
-      (advisorPrompt.length + validMessages.reduce((acc: number, m: { content: string }) => acc + m.content.length, 0)) / 4
-    );
-    
-    // === PHASE 3: Create SSE Stream with Widget + Advisor Response ===
+
+    const parserTokens = parserResult || secretaryResult
+      ? { input: Math.ceil(userInput.length / 4) + 200, output: 100 }
+      : { input: 0, output: 0 };
+
+    // === PHASE 2: Start SSE Stream IMMEDIATELY - Send widgets before context assembly ===
     const encoder = new TextEncoder();
     let totalOutputTokens = 0;
-    
-    // Check if widgets are enabled (feature flag)
-    const featureFlags = await getFeatureFlags();
-    
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          // Send widget data first (if detected AND widgets are enabled)
-          if (featureFlags.enableWidgets && parserResult?.widget) {
+          // Send widget data IMMEDIATELY after parsing (before context assembly)
+          // This ensures widgets appear in ~600ms, not 3+ seconds
+          if (featureFlags.enableWidgets && parserResult?.widgets && parserResult.widgets.length > 0) {
+            console.log(`[Chat] Sending ${parserResult.widgets.length} widget(s) immediately`);
+            for (const widget of parserResult.widgets) {
+              console.log(`[Chat] Widget: type=${widget.type}, data=${JSON.stringify(widget.data || {})}`);
+              const widgetEvent = JSON.stringify({
+                type: "widget",
+                widget: widget,
+              });
+              const sseMessage = `event: widget\ndata: ${widgetEvent}\n\n`;
+              controller.enqueue(encoder.encode(sseMessage));
+            }
+          } else if (featureFlags.enableWidgets && parserResult?.widget) {
+            // Fallback to legacy single widget for backward compat
             const widgetEvent = JSON.stringify({
               type: "widget",
               widget: parserResult.widget,
@@ -156,7 +190,99 @@ export async function POST(request: NextRequest) {
             const sseMessage = `event: widget\ndata: ${widgetEvent}\n\n`;
             controller.enqueue(encoder.encode(sseMessage));
           }
-          
+
+          // ==========================================================================
+          // ROUTING DECISION: Secretary handles vs Claude escalation
+          // ==========================================================================
+          if (secretaryResult?.canHandle && secretaryResult.response) {
+            // === FAST PATH: Secretary (Kimi K2) handles this interaction ===
+            console.log(`[Chat] 🤖 RESPONDING: Kimi K2 (Secretary) - Fast Path`);
+            console.log(`[Chat] Response preview: "${secretaryResult.response.substring(0, 80)}..."`);
+            console.log(`======================================\n`);
+
+            // Execute tool calls from secretary
+            if (secretaryResult.tools && secretaryResult.tools.length > 0) {
+              for (const tool of secretaryResult.tools) {
+                try {
+                  await executeToolCall(profileId, tool.name, tool.args);
+                  console.log(`[Chat] Executed tool: ${tool.name}`);
+                } catch (err) {
+                  console.error(`[Chat] Tool execution error for ${tool.name}:`, err);
+                }
+              }
+            }
+
+            // Stream secretary's response
+            controller.enqueue(encoder.encode(secretaryResult.response));
+
+            // Record usage for secretary
+            await recordUsage({
+              userId,
+              model: "kimi_k2",
+              tokensInput: parserTokens.input,
+              tokensOutput: Math.ceil(secretaryResult.response.length / 4),
+              messageCount: 1,
+            }).catch(err => console.error("Error recording secretary usage:", err));
+
+            // Save conversation
+            saveConversation({
+              profileId,
+              conversationId,
+              mode,
+              messages,
+              assistantText: secretaryResult.response,
+              toolCalls: secretaryResult.tools,
+              parserResult,
+              modelName: "kimi-k2",
+              tokensUsed: parserTokens.input + Math.ceil(secretaryResult.response.length / 4),
+            }).catch(err => console.error("Error saving conversation:", err));
+
+            controller.close();
+            return;
+          }
+
+          // === SLOW PATH: Escalate to Claude for complex reasoning ===
+          console.log(`[Chat] 🧠 RESPONDING: Claude (${modelName}) - Slow Path`);
+          if (secretaryResult && !secretaryResult.canHandle) {
+            console.log(`[Chat] Escalation reason: ${secretaryResult.escalationReason || "complex reasoning needed"}`);
+          }
+          console.log(`======================================\n`);
+
+          // === Get context (from cache if available, otherwise assemble) ===
+          const contextStart = Date.now();
+          let context = getCachedContext(profileId);
+          let cacheHit = !!context;
+
+          if (!context) {
+            // Cache miss - assemble fresh context
+            context = await assembleContext({
+              profileId,
+              mode: mode as EntryMode,
+              messages: validMessages.map((m: { role: string; content: string }) => ({
+                role: m.role as "user" | "assistant",
+                content: m.content,
+              })),
+              sessionStartTime: new Date(),
+            });
+            // Cache for next request
+            setCachedContext(profileId, context);
+          }
+          console.log(`[Chat] Context ${cacheHit ? "CACHE HIT" : "assembled"} in ${Date.now() - contextStart}ms`);
+
+          // Inject parser context into the system prompt
+          let advisorPrompt = context.advisorPrompt;
+          if (parserResult) {
+            const parserContext = formatParserContextForAdvisor(parserResult);
+            if (parserContext) {
+              advisorPrompt += `\n\n## Parser Analysis\n${parserContext}`;
+            }
+          }
+
+          // Estimate input tokens for advisor
+          const estimatedInputTokens = Math.ceil(
+            (advisorPrompt.length + validMessages.reduce((acc: number, m: { content: string }) => acc + m.content.length, 0)) / 4
+          );
+
           // Stream the Advisor response
           const result = streamText({
             model: advisorModel,
@@ -164,6 +290,13 @@ export async function POST(request: NextRequest) {
             messages: validMessages,
             tools: allTools,
             onFinish: async ({ text, toolCalls, toolResults, usage }) => {
+              // Log Claude's response
+              console.log(`[Chat] Claude response complete (${text.length} chars)`);
+              console.log(`[Chat] Claude response preview: "${text.substring(0, 100)}..."`);
+              if (toolCalls && toolCalls.length > 0) {
+                console.log(`[Chat] Claude tool calls: ${toolCalls.map(t => t.name).join(", ")}`);
+              }
+
               // Estimate output tokens
               totalOutputTokens = usage?.outputTokens || Math.ceil(text.length / 4);
               const actualInputTokens = usage?.inputTokens || estimatedInputTokens;

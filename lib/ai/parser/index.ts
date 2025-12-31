@@ -1,18 +1,22 @@
 // =============================================================================
-// PARSER MODULE - Fast entity extraction using Kimi K2
+// SECRETARY MODULE - Intelligent routing using Kimi K2
 // =============================================================================
 
 import { generateText } from "ai";
 import { modelFor } from "../providers";
 import { buildParserPrompt } from "../prompts/parser-prompt";
+import { buildSecretaryPrompt } from "../prompts/secretary-prompt";
 import {
   ParserResponse,
   ParserContext,
+  SecretaryResponse,
   toolToWidgetType,
   WidgetType,
+  Widget,
 } from "./types";
 
 export * from "./types";
+export { buildSecretaryPrompt } from "../prompts/secretary-prompt";
 
 /**
  * Parse a user message to extract entities, intents, and tool calls.
@@ -55,24 +59,29 @@ export async function parseUserMessage(
       intents: Array.isArray(parsed.intents) ? parsed.intents : [],
       tools: Array.isArray(parsed.tools) ? parsed.tools : [],
       acknowledgment: typeof parsed.acknowledgment === "string" ? parsed.acknowledgment : undefined,
-      widget: parsed.widget && typeof parsed.widget === "object" 
-        ? { 
-            type: (parsed.widget as Record<string, unknown>).type as WidgetType, 
-            data: (parsed.widget as Record<string, unknown>).data as Record<string, unknown> || {}
-          }
-        : undefined,
+      widgets: [], // Will be populated below
+      widget: undefined, // Legacy field, set to first widget for backward compat
       questions: Array.isArray(parsed.questions) ? parsed.questions : [],
       confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.8,
     };
-    
-    // Derive widget from tools if not explicitly set
-    if (!response.widget && response.tools.length > 0) {
-      const firstTool = response.tools[0];
-      const widgetType = deriveWidgetType(firstTool.name, firstTool.args);
-      response.widget = {
-        type: widgetType,
-        data: firstTool.args as Record<string, unknown>,
-      };
+
+    // Derive widgets from ALL tools (not just first)
+    if (response.tools.length > 0) {
+      const widgets: Widget[] = [];
+
+      for (const tool of response.tools) {
+        const widgetType = deriveWidgetType(tool.name, tool.args);
+        widgets.push({
+          type: widgetType,
+          data: tool.args as Record<string, unknown>,
+        });
+      }
+
+      response.widgets = widgets;
+      // Set legacy single widget to first one for backward compatibility
+      if (widgets.length > 0) {
+        response.widget = widgets[0];
+      }
     }
     
     const duration = Date.now() - startTime;
@@ -144,6 +153,7 @@ function createEmptyResponse(): ParserResponse {
     entities: [],
     intents: [],
     tools: [],
+    widgets: [],
     questions: [],
     confidence: 0,
   };
@@ -152,15 +162,24 @@ function createEmptyResponse(): ParserResponse {
 /**
  * Quick check if a message likely contains extractable data
  * Used to skip parsing for simple conversational messages
+ *
+ * @param message - The user's message
+ * @param mode - The entry mode (onboarding is more lenient)
  */
-export function shouldParse(message: string): boolean {
+export function shouldParse(message: string, mode?: string): boolean {
   const lowerMessage = message.toLowerCase();
-  
+
+  // During onboarding, ALWAYS parse - we expect name, grade, school
+  // Short responses like "Vansh" or "10th grade" are common
+  if (mode === "onboarding") {
+    return true;
+  }
+
   // Skip very short messages unless they contain numbers
   if (message.length < 10 && !/\d/.test(message)) {
     return false;
   }
-  
+
   // Keywords that suggest extractable data
   const dataKeywords = [
     // Test scores
@@ -173,8 +192,9 @@ export function shouldParse(message: string): boolean {
     "award", "won", "winner", "finalist", "semifinalist", "national", "aime", "usamo",
     // Schools
     "mit", "stanford", "harvard", "yale", "princeton", "college", "university",
-    // Profile
+    // Profile / Grade levels
     "my name", "i'm in", "i am a", "junior", "senior", "sophomore", "freshman",
+    "grade", "9th", "10th", "11th", "12th",
     // Courses and transcripts
     "taking", "ap ", "ib ", "honors", "course", "courses", "class", "classes",
     "transcript", "upload", "schedule",
@@ -185,14 +205,14 @@ export function shouldParse(message: string): boolean {
     // Goals and intentions
     "goal", "plan to", "want to", "hope to", "aiming", "target", "aspire",
   ];
-  
+
   const hasKeyword = dataKeywords.some(keyword => {
     if (keyword.includes("\\")) {
       return new RegExp(keyword, "i").test(lowerMessage);
     }
     return lowerMessage.includes(keyword);
   });
-  
+
   return hasKeyword;
 }
 
@@ -203,9 +223,9 @@ export function formatParserContextForAdvisor(response: ParserResponse): string 
   if (response.entities.length === 0 && response.questions.length === 0) {
     return "";
   }
-  
+
   const parts: string[] = [];
-  
+
   if (response.entities.length > 0) {
     const entitySummary = response.entities.map(e => {
       if (e.subtype) {
@@ -215,18 +235,148 @@ export function formatParserContextForAdvisor(response: ParserResponse): string 
     }).join(", ");
     parts.push(`[Extracted: ${entitySummary}]`);
   }
-  
-  if (response.widget) {
+
+  // Show all widgets that will be displayed
+  if (response.widgets && response.widgets.length > 0) {
+    const widgetTypes = response.widgets.map(w => w.type).join(", ");
+    parts.push(`[Widgets shown: ${widgetTypes}]`);
+  } else if (response.widget) {
+    // Fallback to legacy single widget
     parts.push(`[Widget shown: ${response.widget.type}]`);
   }
-  
+
   if (response.questions.length > 0) {
     parts.push(`[Questions: ${response.questions.join("; ")}]`);
   }
-  
+
   if (response.intents.length > 0) {
     parts.push(`[Intents: ${response.intents.join(", ")}]`);
   }
-  
+
   return parts.join(" ");
+}
+
+// =============================================================================
+// SECRETARY MODEL - Intelligent routing with conversation context
+// =============================================================================
+
+/**
+ * Call the Secretary model (Kimi K2) with full conversation context.
+ * The Secretary decides whether to handle the interaction or escalate to Claude.
+ *
+ * @param userMessage - The user's latest message
+ * @param context - Full context including conversation history
+ * @returns SecretaryResponse with routing decision and optional response
+ */
+export async function callSecretary(
+  userMessage: string,
+  context: ParserContext
+): Promise<SecretaryResponse> {
+  const startTime = Date.now();
+
+  try {
+    const systemPrompt = buildSecretaryPrompt({
+      studentName: context.studentName,
+      grade: context.grade,
+      entryMode: context.entryMode,
+      conversationHistory: context.conversationHistory,
+    });
+
+    const { text } = await generateText({
+      model: modelFor.fastParsing,
+      system: systemPrompt,
+      prompt: userMessage,
+      temperature: 0.2, // Slightly higher for more natural responses
+      maxOutputTokens: 800, // More tokens for response generation
+    });
+
+    // Parse the JSON response
+    const parsed = parseJsonResponse(text);
+
+    if (!parsed || typeof parsed !== "object") {
+      console.warn("[Secretary] Invalid JSON response:", text.slice(0, 200));
+      // Default to escalating on parse failure
+      return createEmptySecretaryResponse(true, "Failed to parse response");
+    }
+
+    console.log("[Secretary] Raw response:", JSON.stringify(parsed).slice(0, 400));
+
+    // Construct the secretary response
+    const response: SecretaryResponse = {
+      // Routing decision
+      canHandle: parsed.canHandle === true,
+      escalationReason: typeof parsed.escalationReason === "string" ? parsed.escalationReason : undefined,
+
+      // Response (if handling)
+      response: typeof parsed.response === "string" ? parsed.response : undefined,
+
+      // Data extraction
+      entities: Array.isArray(parsed.entities) ? parsed.entities : [],
+      intents: Array.isArray(parsed.intents) ? parsed.intents : [],
+      tools: Array.isArray(parsed.tools) ? parsed.tools : [],
+      widgets: [], // Will be populated below
+      widget: undefined,
+      acknowledgment: typeof parsed.acknowledgment === "string" ? parsed.acknowledgment : undefined,
+      questions: Array.isArray(parsed.questions) ? parsed.questions : [],
+      confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.8,
+    };
+
+    // Parse widgets from response or derive from tools
+    if (Array.isArray(parsed.widgets) && parsed.widgets.length > 0) {
+      console.log("[Secretary] Raw widgets from LLM:", JSON.stringify(parsed.widgets));
+      // Validate and normalize widgets
+      response.widgets = parsed.widgets.map((w: Record<string, unknown>) => ({
+        type: (w.type as string) || "profile",
+        data: (w.data as Record<string, unknown>) || {},
+      }));
+      console.log("[Secretary] Normalized widgets:", JSON.stringify(response.widgets));
+    } else if (response.tools.length > 0) {
+      // Derive widgets from tools
+      console.log("[Secretary] Deriving widgets from tools:", JSON.stringify(response.tools));
+      const widgets: Widget[] = [];
+      for (const tool of response.tools) {
+        const widgetType = deriveWidgetType(tool.name, tool.args);
+        widgets.push({
+          type: widgetType,
+          data: tool.args as Record<string, unknown>,
+        });
+      }
+      response.widgets = widgets;
+      console.log("[Secretary] Derived widgets:", JSON.stringify(response.widgets));
+    }
+
+    // Set legacy single widget
+    if (response.widgets.length > 0) {
+      response.widget = response.widgets[0];
+    }
+
+    const duration = Date.now() - startTime;
+    const action = response.canHandle ? "handling" : "escalating";
+    console.log(`[Secretary] Completed in ${duration}ms, ${action}`);
+
+    return response;
+  } catch (error) {
+    console.error("[Secretary] Error:", error);
+    // Default to escalating on error
+    return createEmptySecretaryResponse(true, "Error calling secretary model");
+  }
+}
+
+/**
+ * Create an empty secretary response
+ */
+function createEmptySecretaryResponse(
+  escalate: boolean = false,
+  reason?: string
+): SecretaryResponse {
+  return {
+    canHandle: !escalate,
+    escalationReason: reason,
+    entities: [],
+    intents: [],
+    tools: [],
+    widgets: [],
+    questions: [],
+    confidence: 0,
+  };
 }

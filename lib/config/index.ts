@@ -17,6 +17,7 @@ export type FeatureFlags = {
   enableWidgets: boolean;
   enableChancesCalculation: boolean;
   enableStoryMode: boolean;
+  enableSecretaryModel: boolean;
   maintenanceMode: boolean;
   maintenanceMessage: string | null;
 };
@@ -45,6 +46,8 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
   }
   
   // Try to get from database
+  // Note: We don't include enableSecretaryModel in the Prisma query because
+  // the column may not exist in older schemas. We handle it separately below.
   let config = await prisma.globalConfig.findUnique({
     where: { id: "default" },
     select: {
@@ -55,7 +58,7 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
       maintenanceMessage: true,
     },
   });
-  
+
   // Create default config if not exists
   if (!config) {
     config = await prisma.globalConfig.create({
@@ -69,11 +72,26 @@ export async function getFeatureFlags(): Promise<FeatureFlags> {
       },
     });
   }
-  
+
+  // Try to get enableSecretaryModel separately (may not exist in older schemas)
+  // Default to enabled so the new architecture is active
+  let enableSecretaryModel = true;
+  try {
+    const result = await prisma.$queryRaw<{ enableSecretaryModel: boolean }[]>`
+      SELECT "enableSecretaryModel" FROM "GlobalConfig" WHERE id = 'default'
+    `;
+    if (result.length > 0 && result[0].enableSecretaryModel !== undefined) {
+      enableSecretaryModel = result[0].enableSecretaryModel;
+    }
+  } catch {
+    // Column doesn't exist yet - use default (enabled)
+  }
+
   cachedFlags = {
     enableWidgets: config.enableWidgets,
     enableChancesCalculation: config.enableChancesCalculation,
     enableStoryMode: config.enableStoryMode,
+    enableSecretaryModel,
     maintenanceMode: config.maintenanceMode,
     maintenanceMessage: config.maintenanceMessage,
   };

@@ -18,7 +18,7 @@ import { getCachedProfile, setCachedProfile } from "@/lib/cache/profile-cache";
 
 // Mode descriptions for the AI
 const MODE_CONTEXT: Record<string, string> = {
-  onboarding: "The student just signed up. Focus on warmly welcoming them and asking for their name.",
+  onboarding: "The student just signed up. This is their FIRST interaction. Warmly welcome them and ask for their name.",
   chances: "The student wants to check their admission chances.",
   schools: "The student wants to build their college list.",
   planning: "The student wants to set goals and plan ahead.",
@@ -27,11 +27,33 @@ const MODE_CONTEXT: Record<string, string> = {
   general: "General conversation.",
 };
 
+// Fallback messages by mode (when we can't generate personalized ones)
+const FALLBACK_MESSAGES: Record<string, string> = {
+  onboarding: "Hi! I'm Sesame, your college prep guide. I'm here to help you navigate the college journey calmly — one step at a time. First things first: what should I call you?",
+  chances: "Hi! I'm Sesame, your college prep advisor. Ready to explore your chances at some schools?",
+  schools: "Hi! I'm Sesame, your college prep advisor. Let's work on your school list!",
+  planning: "Hi! I'm Sesame, your college prep advisor. What goals are you working toward?",
+  profile: "Hi! I'm Sesame, your college prep advisor. Let's update your profile!",
+  story: "Hi! I'm Sesame, your college prep advisor. I'd love to hear your story.",
+  general: "Hi! I'm Sesame, your college prep advisor. What's on your mind today?",
+};
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
+  // Parse request body ONCE and save mode for fallback
+  // (can't re-read request body in catch block after it's consumed)
+  let mode = "general";
+  let conversationId: string | undefined;
+  let saveOnly: boolean | undefined;
+  let providedMessage: string | undefined;
+
   try {
-    const { mode = "general", conversationId, saveOnly, message: providedMessage } = await request.json();
+    const body = await request.json();
+    mode = body.mode || "general";
+    conversationId = body.conversationId;
+    saveOnly = body.saveOnly;
+    providedMessage = body.message;
 
     // If saveOnly mode, just save the provided message to DB
     if (saveOnly && conversationId && providedMessage) {
@@ -63,8 +85,9 @@ export async function POST(request: NextRequest) {
     // Get current user's profile ID
     const profileId = await getCurrentProfileId();
     if (!profileId) {
+      // Use mode-specific fallback
       return NextResponse.json({
-        message: "Hi! I'm Sesame, your college prep advisor. What's on your mind today?",
+        message: FALLBACK_MESSAGES[mode] || FALLBACK_MESSAGES.general,
       });
     }
     
@@ -131,8 +154,23 @@ export async function POST(request: NextRequest) {
       }
     }
     
+    // For onboarding, use a specific approach
+    const isOnboarding = mode === "onboarding";
+
     // Generate personalized welcome
-    const systemPrompt = `You are Sesame, a warm college admissions advisor.
+    const systemPrompt = isOnboarding
+      ? `You are Sesame, a warm college prep guide.
+Generate a brief opening message for a BRAND NEW student (2-3 sentences max).
+
+This is their FIRST time using the app. You don't know anything about them yet.
+
+Rules:
+- Welcome them warmly
+- Briefly introduce yourself and your purpose (helping with college prep, keeping things calm)
+- End by asking for their name
+- Keep it SHORT and friendly
+- Do NOT assume you know their name or grade`
+      : `You are Sesame, a warm college admissions advisor.
 Generate a brief opening message (2-3 sentences max).
 
 Mode: ${MODE_CONTEXT[mode] || MODE_CONTEXT.general}
@@ -189,8 +227,10 @@ Rules:
     
   } catch (error) {
     console.error("Welcome message error:", error);
+    // Use mode that was saved before any errors could occur
+    console.log(`[Welcome] Error occurred, using ${mode} fallback`);
     return NextResponse.json({
-      message: "Hi! I'm Sesame, your college prep advisor. What's on your mind today?",
+      message: FALLBACK_MESSAGES[mode] || FALLBACK_MESSAGES.general,
     });
   }
 }

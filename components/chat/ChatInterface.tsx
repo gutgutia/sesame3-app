@@ -72,6 +72,13 @@ export function ChatInterface({
         const response = await fetch(`/api/conversations?mode=${mode}`);
 
         if (!response.ok) {
+          // For onboarding, gracefully handle failed conversation load
+          // The welcome message is fetched separately, and conversation will be created on first message
+          if (mode === "onboarding") {
+            console.warn("[Chat] Could not load conversation for onboarding, will use welcome message");
+            setIsLoading(false);
+            return;
+          }
           console.error("[Chat] Failed to load conversation");
           setIsLoading(false);
           return;
@@ -236,50 +243,79 @@ export function ChatInterface({
       
       setMessages(prev => [...prev, assistantMessage]);
       
+      // Track widgets collected across all chunks
+      const collectedWidgets: PendingWidget[] = [];
+
       // Read the stream - handle both SSE events and plain text
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        
+
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
 
-        // Check for SSE widget event at start of stream
-        if (buffer.includes("event: widget")) {
-          const eventMatch = buffer.match(/event: widget\ndata: (.+?)(\n\n|$)/);
-          if (eventMatch) {
+        // Split buffer into SSE events (separated by double newlines)
+        // Process complete events, keep incomplete ones in buffer
+        const parts = buffer.split("\n\n");
+
+        // Last part might be incomplete, keep it in buffer
+        buffer = parts.pop() || "";
+
+        // Process complete SSE events
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (!trimmed) continue;
+
+          // Check if this is a widget event
+          const widgetMatch = trimmed.match(/^event: widget\ndata: (.+)$/s);
+          if (widgetMatch) {
             try {
-              const eventData = JSON.parse(eventMatch[1]);
+              const eventData = JSON.parse(widgetMatch[1]);
               if (eventData.type === "widget" && eventData.widget) {
                 // Normalize widget data (parser uses satTotal/satMath/satReading, API uses total/math/reading)
                 const normalizedData = normalizeWidgetData(eventData.widget.type, eventData.widget.data);
                 const widget: PendingWidget = {
-                  id: `widget-${Date.now()}`,
+                  id: `widget-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
                   type: eventData.widget.type as WidgetType,
                   data: normalizedData,
                   status: "pending",
                 };
-                setPendingWidgets(prev => [...prev, widget]);
+                collectedWidgets.push(widget);
+                console.log("[Chat] Parsed widget:", widget.type, widget.id, widget.data);
               }
             } catch (e) {
-              console.error("[Chat] Failed to parse widget event:", e);
+              console.error("[Chat] Failed to parse widget event:", e, widgetMatch[1]);
             }
-            // Remove the SSE event from buffer, keep the rest as text
-            buffer = buffer.replace(/event: widget\ndata: .+?(\n\n|$)/, "");
+          } else {
+            // Not a widget event - treat as text content
+            fullText += trimmed;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantMessage.id
+                  ? { ...m, content: fullText }
+                  : m
+              )
+            );
           }
         }
-        
-        // Everything else is text content
-        if (buffer) {
-          fullText = buffer;
-          setMessages(prev => 
-            prev.map(m => 
-              m.id === assistantMessage.id 
-                ? { ...m, content: fullText }
-                : m
-            )
-          );
-        }
+      }
+
+      // Process any remaining buffer content as text
+      if (buffer.trim()) {
+        fullText += buffer.trim();
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantMessage.id
+              ? { ...m, content: fullText }
+              : m
+          )
+        );
+      }
+
+      // Add all collected widgets to state at once (after stream ends)
+      if (collectedWidgets.length > 0) {
+        console.log("[Chat] Adding", collectedWidgets.length, "widgets to state:", collectedWidgets.map(w => w.type));
+        setPendingWidgets(prev => [...prev, ...collectedWidgets]);
       }
       
       // Fallback for empty response
@@ -329,8 +365,8 @@ export function ChatInterface({
     }
   }, [initialMessage, sendMessage]);
   
-  // Get current pending widget (show one at a time)
-  const currentWidget = pendingWidgets.find(w => w.status === "pending");
+  // Get ALL pending widgets (show multiple at once)
+  const currentWidgets = pendingWidgets.filter(w => w.status === "pending");
   
   // Handle widget confirmation
   const handleWidgetConfirm = async (widgetId: string, data: Record<string, unknown>) => {
@@ -417,11 +453,14 @@ export function ChatInterface({
         prev.map(w => w.id === widgetId ? { ...w, status: "confirmed" as const } : w)
       );
 
+      // Normalize widget data to API format before sending
+      const apiData = normalizeWidgetDataForApi(widget.type, data);
+
       // Call API in background
       const response = await fetch(endpoint, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify(apiData),
       });
 
       if (response.ok) {
@@ -444,11 +483,14 @@ export function ChatInterface({
     );
   };
   
+  // Check if input should be blocked (non-recommendation widgets are pending)
+  const hasBlockingWidgets = currentWidgets.some(w => !isRecommendationWidget(w.type));
+
   // Handle form submit
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading || currentWidget) return;
-    
+    if (!input.trim() || isLoading || hasBlockingWidgets) return;
+
     sendMessage(input.trim());
     setInput("");
   };
@@ -509,38 +551,40 @@ export function ChatInterface({
           </div>
         )}
         
-        {/* Current pending widget */}
-        {currentWidget && !isLoading && (
-          <div className="flex justify-start">
-            {isRecommendationWidget(currentWidget.type) ? (
-              // Recommendation widgets use full width for better carousel display
-              <div className="w-full max-w-3xl">
-                <RecommendationCarousel
-                  type={currentWidget.type as "program_recommendations" | "school_recommendations"}
-                  data={currentWidget.data as { focusArea?: string; tier?: string; schools?: string[]; programs?: string[] }}
-                  onAddToList={() => {
-                    // Optionally track adds
-                    onProfileUpdate?.();
-                  }}
-                  onDismiss={() => handleWidgetDismiss(currentWidget.id)}
-                />
-              </div>
-            ) : (
-              // Regular confirmation widgets are narrower
-              <div className="max-w-md w-full">
-                <ConfirmationWidget
-                  type={currentWidget.type}
-                  data={currentWidget.data}
-                  onConfirm={(data) => handleWidgetConfirm(currentWidget.id, data)}
-                  onDismiss={() => handleWidgetDismiss(currentWidget.id)}
-                />
-              </div>
-            )}
+        {/* Pending widgets - show multiple side by side */}
+        {currentWidgets.length > 0 && !isLoading && (
+          <div className="flex flex-wrap gap-3 justify-start">
+            {currentWidgets.map((widget) => (
+              isRecommendationWidget(widget.type) ? (
+                // Recommendation widgets use full width for better carousel display
+                <div key={widget.id} className="w-full max-w-3xl">
+                  <RecommendationCarousel
+                    type={widget.type as "program_recommendations" | "school_recommendations"}
+                    data={widget.data as { focusArea?: string; tier?: string; schools?: string[]; programs?: string[] }}
+                    onAddToList={() => {
+                      // Optionally track adds
+                      onProfileUpdate?.();
+                    }}
+                    onDismiss={() => handleWidgetDismiss(widget.id)}
+                  />
+                </div>
+              ) : (
+                // Regular confirmation widgets - compact side by side
+                <div key={widget.id} className="w-full sm:w-auto sm:min-w-[280px] sm:max-w-[320px]">
+                  <ConfirmationWidget
+                    type={widget.type}
+                    data={widget.data}
+                    onConfirm={(data) => handleWidgetConfirm(widget.id, data)}
+                    onDismiss={() => handleWidgetDismiss(widget.id)}
+                  />
+                </div>
+              )
+            ))}
           </div>
         )}
         
         {/* Confirmed widgets indicator */}
-        {pendingWidgets.filter(w => w.status === "confirmed").length > 0 && !currentWidget && (
+        {pendingWidgets.filter(w => w.status === "confirmed").length > 0 && currentWidgets.length === 0 && (
           <div className="flex justify-start">
             <div className="bg-success-bg border border-[#BBF7D0] rounded-xl px-4 py-2 text-sm text-success-text flex items-center gap-2">
               <span>✓</span>
@@ -562,12 +606,12 @@ export function ChatInterface({
             onChange={(e) => setInput(e.target.value)}
             placeholder="What's on your mind?"
             className="w-full bg-bg-sidebar border border-border-medium rounded-xl pl-5 pr-14 py-4 text-[15px] focus:outline-none focus:border-accent-primary focus:ring-4 focus:ring-accent-surface transition-all"
-            disabled={isLoading || (!!currentWidget && !isRecommendationWidget(currentWidget.type))}
+            disabled={isLoading || hasBlockingWidgets}
             autoFocus
           />
           <button
             type="submit"
-            disabled={!input.trim() || isLoading || (!!currentWidget && !isRecommendationWidget(currentWidget.type))}
+            disabled={!input.trim() || isLoading || hasBlockingWidgets}
             className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-text-main text-white rounded-lg hover:bg-black/80 disabled:opacity-40 transition-colors"
           >
             <Send className="w-4 h-4" />
@@ -586,6 +630,11 @@ function isRecommendationWidget(type: WidgetType): boolean {
 
 function getApiEndpoint(widgetType: WidgetType): string | null {
   const endpoints: Record<WidgetType, string | null> = {
+    // Onboarding micro-widgets - all use profile PUT endpoint
+    name: "/api/profile",
+    grade: "/api/profile",
+    highschool: "/api/profile",
+    // Standard widgets
     sat: "/api/profile/testing/sat",
     act: "/api/profile/testing/act",
     activity: "/api/profile/activities",
@@ -605,6 +654,7 @@ function getApiEndpoint(widgetType: WidgetType): string | null {
 
 function getApiMethod(widgetType: WidgetType): string {
   const postTypes: WidgetType[] = ["activity", "award", "program", "goal", "school", "sat", "act"];
+  // Onboarding widgets use PUT for profile updates
   return postTypes.includes(widgetType) ? "POST" : "PUT";
 }
 
@@ -614,6 +664,31 @@ function getApiMethod(widgetType: WidgetType): string {
  * API uses: total, math, reading, composite, etc.
  */
 function normalizeWidgetData(widgetType: string, data: Record<string, unknown>): Record<string, unknown> {
+  // Onboarding micro-widgets - keep original field names for widget display
+  if (widgetType === "name") {
+    return {
+      firstName: data.firstName,
+      lastName: data.lastName,
+    };
+  }
+
+  if (widgetType === "grade") {
+    return {
+      grade: data.grade,
+    };
+  }
+
+  if (widgetType === "highschool") {
+    // Keep original field names for widget display
+    // Transformation to API format happens in normalizeWidgetDataForApi
+    return {
+      name: data.name,
+      city: data.city,
+      state: data.state,
+    };
+  }
+
+  // Standard widgets
   if (widgetType === "sat") {
     return {
       total: data.satTotal ?? data.total,
@@ -632,6 +707,46 @@ function normalizeWidgetData(widgetType: string, data: Record<string, unknown>):
       science: data.actScience ?? data.science,
       testDate: data.testDate,
     };
+  }
+
+  // For other widget types, return data as-is
+  return data;
+}
+
+/**
+ * Normalize widget form data to API format before sending.
+ * This transforms the widget's internal field names to what the API expects.
+ */
+function normalizeWidgetDataForApi(widgetType: WidgetType, data: Record<string, unknown>): Record<string, unknown> {
+  // Onboarding micro-widgets need field name transformations
+  if (widgetType === "highschool") {
+    // Widget uses "name", API expects "highSchoolName"
+    return {
+      highSchoolName: data.name,
+      highSchoolCity: data.city,
+      highSchoolState: data.state,
+    };
+  }
+
+  // School widget - API expects schoolId (for known) or customName (for unknown)
+  if (widgetType === "school") {
+    if (data.schoolId) {
+      // Known school - use schoolId
+      return {
+        schoolId: data.schoolId,
+        tier: data.tier,
+        isDream: data.tier === "dream",
+        whyInterested: data.whyInterested,
+      };
+    } else {
+      // Unknown school - use customName
+      return {
+        customName: data.name || data.schoolName,
+        tier: data.tier,
+        isDream: data.tier === "dream",
+        whyInterested: data.whyInterested,
+      };
+    }
   }
 
   // For other widget types, return data as-is
