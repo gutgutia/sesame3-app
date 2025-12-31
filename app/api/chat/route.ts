@@ -302,7 +302,7 @@ export async function POST(request: NextRequest) {
               console.log(`[Chat] Claude response complete (${text.length} chars)`);
               console.log(`[Chat] Claude response preview: "${text.substring(0, 100)}..."`);
               if (toolCalls && toolCalls.length > 0) {
-                console.log(`[Chat] Claude tool calls: ${toolCalls.map(t => t.name).join(", ")}`);
+                console.log(`[Chat] Claude tool calls: ${toolCalls.map(t => t.toolName).join(", ")}`);
               }
 
               // Estimate output tokens

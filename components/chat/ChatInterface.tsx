@@ -267,7 +267,8 @@ export function ChatInterface({
           if (!trimmed) continue;
 
           // Check if this is a widget event
-          const widgetMatch = trimmed.match(/^event: widget\ndata: (.+)$/s);
+          // Use [\s\S] instead of /s flag for broader compatibility
+          const widgetMatch = trimmed.match(/^event: widget\ndata: ([\s\S]+)$/);
           if (widgetMatch) {
             try {
               const eventData = JSON.parse(widgetMatch[1]);
