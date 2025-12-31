@@ -637,7 +637,7 @@ function getApiMethod(widgetType: WidgetType): string {
  * API uses: total, math, reading, composite, etc.
  */
 function normalizeWidgetData(widgetType: string, data: Record<string, unknown>): Record<string, unknown> {
-  // Onboarding micro-widgets
+  // Onboarding micro-widgets - keep original field names for widget display
   if (widgetType === "name") {
     return {
       firstName: data.firstName,
@@ -652,11 +652,12 @@ function normalizeWidgetData(widgetType: string, data: Record<string, unknown>):
   }
 
   if (widgetType === "highschool") {
-    // Widget uses "name", API expects "highSchoolName"
+    // Keep original field names for widget display
+    // Transformation to API format happens in normalizeWidgetDataForApi
     return {
-      highSchoolName: data.name,
-      highSchoolCity: data.city,
-      highSchoolState: data.state,
+      name: data.name,
+      city: data.city,
+      state: data.state,
     };
   }
 

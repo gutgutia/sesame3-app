@@ -294,17 +294,20 @@ export async function handleAddSchoolToList(
   profileId: string,
   params: {
     schoolName: string;
-    tier: string;
+    tier?: string;
     interestLevel?: string;
     applicationType?: string;
     whyInterested?: string;
   }
 ) {
+  // Default tier to "target" if not specified
+  const tier = params.tier || "target";
+
   // First, find or create the school in our reference data
   let school = await prisma.school.findFirst({
     where: { name: { contains: params.schoolName, mode: "insensitive" } },
   });
-  
+
   if (!school) {
     // Create a basic school entry (can be enriched later)
     school = await prisma.school.create({
@@ -313,7 +316,7 @@ export async function handleAddSchoolToList(
       },
     });
   }
-  
+
   // Check if already on list
   const existing = await prisma.studentSchool.findUnique({
     where: {
@@ -323,23 +326,23 @@ export async function handleAddSchoolToList(
       },
     },
   });
-  
+
   if (existing) {
     // Update existing entry
     const updated = await prisma.studentSchool.update({
       where: { id: existing.id },
       data: {
-        tier: params.tier,
+        tier: tier,
         interestLevel: params.interestLevel,
         applicationType: params.applicationType,
         whyInterested: params.whyInterested,
       },
       include: { school: true },
     });
-    
+
     return {
       success: true,
-      message: `Updated ${params.schoolName} on your list (${params.tier})`,
+      message: `Updated ${params.schoolName} on your list (${tier})`,
       data: updated,
     };
   }
@@ -355,7 +358,7 @@ export async function handleAddSchoolToList(
     data: {
       studentProfileId: profileId,
       schoolId: school.id,
-      tier: params.tier,
+      tier: tier,
       interestLevel: params.interestLevel,
       applicationType: params.applicationType,
       whyInterested: params.whyInterested,
@@ -363,10 +366,10 @@ export async function handleAddSchoolToList(
     },
     include: { school: true },
   });
-  
+
   return {
     success: true,
-    message: `Added ${params.schoolName} to your list as a ${params.tier}`,
+    message: `Added ${params.schoolName} to your list as a ${tier}`,
     data: studentSchool,
     requiresConfirmation: true,
     widgetType: "school",
