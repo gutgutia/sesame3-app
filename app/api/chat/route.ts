@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
           if (featureFlags.enableWidgets && parserResult?.widgets && parserResult.widgets.length > 0) {
             console.log(`[Chat] Sending ${parserResult.widgets.length} widget(s) immediately`);
             for (const widget of parserResult.widgets) {
+              console.log(`[Chat] Widget: type=${widget.type}, data=${JSON.stringify(widget.data || {})}`);
               const widgetEvent = JSON.stringify({
                 type: "widget",
                 widget: widget,

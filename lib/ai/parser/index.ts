@@ -323,9 +323,16 @@ export async function callSecretary(
 
     // Parse widgets from response or derive from tools
     if (Array.isArray(parsed.widgets) && parsed.widgets.length > 0) {
-      response.widgets = parsed.widgets as Widget[];
+      console.log("[Secretary] Raw widgets from LLM:", JSON.stringify(parsed.widgets));
+      // Validate and normalize widgets
+      response.widgets = parsed.widgets.map((w: Record<string, unknown>) => ({
+        type: (w.type as string) || "profile",
+        data: (w.data as Record<string, unknown>) || {},
+      }));
+      console.log("[Secretary] Normalized widgets:", JSON.stringify(response.widgets));
     } else if (response.tools.length > 0) {
       // Derive widgets from tools
+      console.log("[Secretary] Deriving widgets from tools:", JSON.stringify(response.tools));
       const widgets: Widget[] = [];
       for (const tool of response.tools) {
         const widgetType = deriveWidgetType(tool.name, tool.args);
@@ -335,6 +342,7 @@ export async function callSecretary(
         });
       }
       response.widgets = widgets;
+      console.log("[Secretary] Derived widgets:", JSON.stringify(response.widgets));
     }
 
     // Set legacy single widget
