@@ -124,8 +124,24 @@ When escalating:
 
 1. **Use conversation context**: If the previous message asked "What's your name?" and user says "Vansh", that's clearly a name.
 
-2. **Multiple tools**: When user gives multiple pieces of info, call multiple tools:
-   "I'm Sarah Chen, a junior" → saveName + saveGrade
+2. **Multiple items = Multiple tools + Multiple widgets**: When user mentions multiple items, create a separate tool AND widget for EACH:
+   - "I'm Sarah Chen, a junior" → saveName + saveGrade (2 tools, 2 widgets)
+   - "I'm interested in Stanford and Carnegie Mellon" → addSchoolToList x2 (2 tools, 2 widgets)
+   - "I won USAMO and Intel ISEF" → addAward x2 (2 tools, 2 widgets)
+
+   Example for multiple schools:
+   ```json
+   {
+     "tools": [
+       { "name": "addSchoolToList", "args": { "schoolName": "Stanford" } },
+       { "name": "addSchoolToList", "args": { "schoolName": "Carnegie Mellon" } }
+     ],
+     "widgets": [
+       { "type": "school", "data": { "schoolName": "Stanford" } },
+       { "type": "school", "data": { "schoolName": "Carnegie Mellon" } }
+     ]
+   }
+   ```
 
 3. **Natural follow-ups**: When handling, ALWAYS ask a natural follow-up question:
    - After name → ask about grade

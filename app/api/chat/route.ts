@@ -125,10 +125,20 @@ export async function POST(request: NextRequest) {
         entryMode: mode,
         conversationHistory: conversationHistory.slice(0, -1), // Exclude current message (it's in userInput)
       });
-      console.log(`[Chat] Secretary completed in ${Date.now() - parseStart}ms, canHandle: ${secretaryResult.canHandle}`);
+      console.log(`\n========== CHAT REQUEST ==========`);
+      console.log(`[Chat] Mode: ${mode}`);
+      console.log(`[Chat] User: "${userInput.substring(0, 100)}${userInput.length > 100 ? '...' : ''}"`);
+      console.log(`[Chat] Secretary completed in ${Date.now() - parseStart}ms`);
+      console.log(`[Chat] Can Handle: ${secretaryResult.canHandle}`);
+      console.log(`[Chat] Widgets: ${secretaryResult.widgets?.length || 0}`, secretaryResult.widgets?.map(w => w.type) || []);
+      console.log(`[Chat] Tools: ${secretaryResult.tools?.length || 0}`, secretaryResult.tools?.map(t => t.name) || []);
+      if (!secretaryResult.canHandle) {
+        console.log(`[Chat] Escalation Reason: ${secretaryResult.escalationReason || 'not specified'}`);
+      }
     } else if (isUserMessage && shouldParse(userInput, mode)) {
       // LEGACY: Stateless parser (fallback)
       parserResult = await parseUserMessage(userInput, { entryMode: mode });
+      console.log(`\n========== CHAT REQUEST (LEGACY PARSER) ==========`);
       console.log(`[Chat] Parser completed in ${Date.now() - parseStart}ms`);
     }
 
@@ -185,7 +195,9 @@ export async function POST(request: NextRequest) {
           // ==========================================================================
           if (secretaryResult?.canHandle && secretaryResult.response) {
             // === FAST PATH: Secretary (Kimi K2) handles this interaction ===
-            console.log(`[Chat] Secretary handling response directly`);
+            console.log(`[Chat] 🤖 RESPONDING: Kimi K2 (Secretary) - Fast Path`);
+            console.log(`[Chat] Response preview: "${secretaryResult.response.substring(0, 80)}..."`);
+            console.log(`======================================\n`);
 
             // Execute tool calls from secretary
             if (secretaryResult.tools && secretaryResult.tools.length > 0) {
@@ -229,9 +241,11 @@ export async function POST(request: NextRequest) {
           }
 
           // === SLOW PATH: Escalate to Claude for complex reasoning ===
+          console.log(`[Chat] 🧠 RESPONDING: Claude (${modelName}) - Slow Path`);
           if (secretaryResult && !secretaryResult.canHandle) {
-            console.log(`[Chat] Escalating to Claude: ${secretaryResult.escalationReason || "complex reasoning needed"}`);
+            console.log(`[Chat] Escalation reason: ${secretaryResult.escalationReason || "complex reasoning needed"}`);
           }
+          console.log(`======================================\n`);
 
           // === Get context (from cache if available, otherwise assemble) ===
           const contextStart = Date.now();
