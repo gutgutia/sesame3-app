@@ -20,7 +20,7 @@ type PendingWidget = {
   id: string;
   type: WidgetType;
   data: Record<string, unknown>;
-  status: "pending" | "confirmed" | "dismissed";
+  status: "pending" | "confirmed" | "dismissed" | "saved";
 };
 
 // Loaded conversation from API
@@ -267,21 +267,24 @@ export function ChatInterface({
           if (!trimmed) continue;
 
           // Check if this is a widget event
-          const widgetMatch = trimmed.match(/^event: widget\ndata: (.+)$/s);
+          // Use [\s\S] instead of /s flag for broader compatibility
+          const widgetMatch = trimmed.match(/^event: widget\ndata: ([\s\S]+)$/);
           if (widgetMatch) {
             try {
               const eventData = JSON.parse(widgetMatch[1]);
               if (eventData.type === "widget" && eventData.widget) {
                 // Normalize widget data (parser uses satTotal/satMath/satReading, API uses total/math/reading)
                 const normalizedData = normalizeWidgetData(eventData.widget.type, eventData.widget.data);
+                // If server already saved (secretary handled), mark as "saved" instead of "pending"
+                const isSaved = eventData.saved === true;
                 const widget: PendingWidget = {
                   id: `widget-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
                   type: eventData.widget.type as WidgetType,
                   data: normalizedData,
-                  status: "pending",
+                  status: isSaved ? "saved" : "pending",
                 };
                 collectedWidgets.push(widget);
-                console.log("[Chat] Parsed widget:", widget.type, widget.id, widget.data);
+                console.log("[Chat] Parsed widget:", widget.type, widget.id, isSaved ? "(saved)" : "(pending)", widget.data);
               }
             } catch (e) {
               console.error("[Chat] Failed to parse widget event:", e, widgetMatch[1]);
@@ -365,8 +368,8 @@ export function ChatInterface({
     }
   }, [initialMessage, sendMessage]);
   
-  // Get ALL pending widgets (show multiple at once)
-  const currentWidgets = pendingWidgets.filter(w => w.status === "pending");
+  // Get widgets to show: pending (need confirmation) and saved (show confirmation with undo)
+  const currentWidgets = pendingWidgets.filter(w => w.status === "pending" || w.status === "saved");
   
   // Handle widget confirmation
   const handleWidgetConfirm = async (widgetId: string, data: Record<string, unknown>) => {
@@ -478,13 +481,35 @@ export function ChatInterface({
   
   // Handle widget dismiss
   const handleWidgetDismiss = (widgetId: string) => {
-    setPendingWidgets(prev => 
+    setPendingWidgets(prev =>
       prev.map(w => w.id === widgetId ? { ...w, status: "dismissed" as const } : w)
     );
   };
-  
-  // Check if input should be blocked (non-recommendation widgets are pending)
-  const hasBlockingWidgets = currentWidgets.some(w => !isRecommendationWidget(w.type));
+
+  // Handle widget undo (for already-saved widgets)
+  const handleWidgetUndo = async (widgetId: string) => {
+    const widget = pendingWidgets.find(w => w.id === widgetId);
+    if (!widget) return;
+
+    // Mark as dismissed in UI immediately
+    setPendingWidgets(prev =>
+      prev.map(w => w.id === widgetId ? { ...w, status: "dismissed" as const } : w)
+    );
+
+    // TODO: Call delete API to remove from database
+    // For now, we just hide it from the UI
+    // The user can manually delete from their profile if needed
+    console.log("[Chat] Undo saved widget:", widget.type, widget.data);
+
+    // Refresh profile to show any changes
+    refreshProfile();
+  };
+
+  // Check if input should be blocked (only pending non-recommendation widgets block input)
+  // Saved widgets don't block because they're already confirmed
+  const hasBlockingWidgets = currentWidgets.some(w =>
+    w.status === "pending" && !isRecommendationWidget(w.type)
+  );
 
   // Handle form submit
   const handleSubmit = (e: React.FormEvent) => {
@@ -551,7 +576,7 @@ export function ChatInterface({
           </div>
         )}
         
-        {/* Pending widgets - show multiple side by side */}
+        {/* Widgets - show multiple side by side */}
         {currentWidgets.length > 0 && !isLoading && (
           <div className="flex flex-wrap gap-3 justify-start">
             {currentWidgets.map((widget) => (
@@ -567,6 +592,22 @@ export function ChatInterface({
                     }}
                     onDismiss={() => handleWidgetDismiss(widget.id)}
                   />
+                </div>
+              ) : widget.status === "saved" ? (
+                // Already saved widgets - show compact confirmation with undo
+                <div key={widget.id} className="bg-success-bg border border-[#BBF7D0] rounded-xl px-4 py-3 text-sm flex items-center gap-3">
+                  <span className="text-success-text flex items-center gap-2">
+                    <span>✓</span>
+                    <span className="font-medium">
+                      {getWidgetSummary(widget.type, widget.data)}
+                    </span>
+                  </span>
+                  <button
+                    onClick={() => handleWidgetUndo(widget.id)}
+                    className="text-text-muted hover:text-text-main text-xs underline"
+                  >
+                    Undo
+                  </button>
                 </div>
               ) : (
                 // Regular confirmation widgets - compact side by side
@@ -751,4 +792,34 @@ function normalizeWidgetDataForApi(widgetType: WidgetType, data: Record<string, 
 
   // For other widget types, return data as-is
   return data;
+}
+
+/**
+ * Get a human-readable summary of a saved widget
+ */
+function getWidgetSummary(widgetType: WidgetType, data: Record<string, unknown>): string {
+  switch (widgetType) {
+    case "name":
+      return `Saved: ${data.firstName}${data.lastName ? ` ${data.lastName}` : ""}`;
+    case "grade":
+      return `Saved: ${data.grade}`;
+    case "highschool":
+      return `Saved: ${data.name}`;
+    case "activity":
+      return `Added activity: ${data.title || data.organization || "Activity"}`;
+    case "award":
+      return `Added award: ${data.title || "Award"}`;
+    case "school":
+      return `Added school: ${data.schoolName || data.name || "School"}`;
+    case "program":
+      return `Added program: ${data.name || "Program"}`;
+    case "sat":
+      return `Saved SAT: ${data.total || "scores"}`;
+    case "act":
+      return `Saved ACT: ${data.composite || "scores"}`;
+    case "goal":
+      return `Added goal: ${data.title || "Goal"}`;
+    default:
+      return "Saved";
+  }
 }

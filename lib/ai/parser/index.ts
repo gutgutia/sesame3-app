@@ -326,7 +326,7 @@ export async function callSecretary(
       console.log("[Secretary] Raw widgets from LLM:", JSON.stringify(parsed.widgets));
       // Validate and normalize widgets
       response.widgets = parsed.widgets.map((w: Record<string, unknown>) => ({
-        type: (w.type as string) || "profile",
+        type: ((w.type as string) || "profile") as WidgetType,
         data: (w.data as Record<string, unknown>) || {},
       }));
       console.log("[Secretary] Normalized widgets:", JSON.stringify(response.widgets));
