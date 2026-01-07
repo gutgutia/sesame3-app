@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, Suspense } from "react";
 import { ArrowRight, Mail, CheckCircle2, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { useRouter, useSearchParams } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AuthPage() {
   return (
@@ -30,6 +31,7 @@ function AuthPageContent() {
   const [code, setCode] = useState("");
   const [step, setStep] = useState<"start" | "code">("start");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
 
@@ -38,12 +40,58 @@ function AuthPageContent() {
 
   const codeInputRef = useRef<HTMLInputElement>(null);
 
+  // Check for OAuth error in URL params
+  useEffect(() => {
+    const errorParam = searchParams.get("error");
+    if (errorParam) {
+      const errorMessages: Record<string, string> = {
+        auth_failed: "Authentication failed. Please try again.",
+        no_session: "Could not create session. Please try again.",
+        no_code: "Authentication incomplete. Please try again.",
+        unexpected: "An unexpected error occurred. Please try again.",
+      };
+      setError(errorMessages[errorParam] || "Authentication failed. Please try again.");
+    }
+  }, [searchParams]);
+
   // Focus code input when step changes to code
   useEffect(() => {
     if (step === "code" && codeInputRef.current) {
       codeInputRef.current.focus();
     }
   }, [step]);
+
+  const handleGoogleSignIn = async () => {
+    setIsGoogleLoading(true);
+    setError(null);
+
+    try {
+      const supabase = createClient();
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
+          queryParams: {
+            access_type: "offline",
+            prompt: "consent",
+          },
+          skipBrowserRedirect: false,
+        },
+      });
+
+      if (error) {
+        console.error("[Auth] Google sign-in error:", error);
+        setError("Failed to start Google sign-in. Please try again.");
+        setIsGoogleLoading(false);
+      }
+      // If successful, user is redirected to Google - no need to reset loading
+    } catch (err) {
+      console.error("[Auth] Google sign-in exception:", err);
+      setError("Failed to start Google sign-in. Please try again.");
+      setIsGoogleLoading(false);
+    }
+  };
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -186,13 +234,21 @@ function AuthPageContent() {
                 </p>
               </div>
 
-              <button className="w-full flex items-center justify-center gap-3 bg-white border border-border-medium hover:bg-bg-sidebar py-3.5 rounded-xl font-medium text-text-main transition-colors mb-6 shadow-sm hover:shadow-md">
-                <img
-                  src="https://www.svgrepo.com/show/475656/google-color.svg"
-                  className="w-5 h-5"
-                  alt="Google"
-                />
-                Continue with Google
+              <button
+                onClick={handleGoogleSignIn}
+                disabled={isGoogleLoading}
+                className="w-full flex items-center justify-center gap-3 bg-white border border-border-medium hover:bg-bg-sidebar py-3.5 rounded-xl font-medium text-text-main transition-colors mb-6 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isGoogleLoading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <img
+                    src="https://www.svgrepo.com/show/475656/google-color.svg"
+                    className="w-5 h-5"
+                    alt="Google"
+                  />
+                )}
+                {isGoogleLoading ? "Connecting..." : "Continue with Google"}
               </button>
 
               <div className="flex items-center gap-4 mb-6">
