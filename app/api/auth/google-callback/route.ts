@@ -15,7 +15,7 @@ import { cookies } from "next/headers";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { accessToken, redirect = "/" } = body;
+    const { accessToken, redirect = "/dashboard" } = body;
 
     if (!accessToken) {
       return NextResponse.json(

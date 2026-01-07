@@ -94,7 +94,7 @@ function AuthCallbackContent() {
 
     const completeAuth = async (accessToken: string) => {
       // Get redirect from URL params
-      const redirect = searchParams.get("redirect") || "/";
+      const redirect = searchParams.get("redirect") || "/dashboard";
 
       // Call our API to create/update user and set session cookies
       const response = await fetch("/api/auth/google-callback", {

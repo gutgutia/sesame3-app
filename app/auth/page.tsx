@@ -25,7 +25,7 @@ function AuthPageLoading() {
 function AuthPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/";
+  const redirect = searchParams.get("redirect") || "/dashboard";
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");

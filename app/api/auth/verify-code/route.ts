@@ -204,7 +204,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Determine redirect
-    let redirectTo = "/";
+    let redirectTo = "/dashboard";
     if (isNewUser) {
       // Check if user has any access grants (meaning they were invited)
       const hasAccessGrants = await prisma.accessGrant.findFirst({
@@ -217,7 +217,7 @@ export async function POST(request: NextRequest) {
       // If they have access grants but are new, skip onboarding
       // They're likely a parent/viewer who doesn't need their own profile
       if (hasAccessGrants) {
-        redirectTo = "/";
+        redirectTo = "/dashboard";
       } else {
         redirectTo = "/onboarding";
       }

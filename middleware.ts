@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-const protectedRoutes = ["/", "/plan", "/profile", "/schools", "/discover", "/advisor", "/chances", "/settings", "/onboarding", "/opportunities", "/summer-programs"];
+const protectedRoutes = ["/dashboard", "/plan", "/profile", "/schools", "/discover", "/advisor", "/chances", "/settings", "/onboarding", "/opportunities", "/summer-programs", "/recommendations"];
 const authRoutes = ["/login", "/auth"];
 
 // Session cookie names
@@ -69,10 +69,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect to home if accessing auth routes while logged in
+  // Redirect to dashboard if accessing auth routes while logged in
   if (isAuthRoute && authenticated) {
     const url = request.nextUrl.clone();
-    url.pathname = "/";
+    url.pathname = "/dashboard";
     return NextResponse.redirect(url);
   }
 
