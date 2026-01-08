@@ -31,7 +31,7 @@ export default function OnboardingPage() {
       } catch (error) {
         console.error("Failed to fetch welcome message:", error);
         // Use a default onboarding welcome if fetch fails
-        setWelcomeMessage("Hi! I'm Sesame, your college prep guide. I'm here to help you navigate the college journey calmly — one step at a time. First things first: what should I call you?");
+        setWelcomeMessage("Hi! I'm Sesame3, your college prep guide. I'm here to help you navigate the college journey calmly — one step at a time. First things first: what should I call you?");
       }
     };
 
@@ -71,7 +71,7 @@ export default function OnboardingPage() {
             <div className="w-10 h-10 bg-text-main text-white rounded-xl flex items-center justify-center font-bold text-sm">
               S3
             </div>
-            <span className="font-display font-bold text-xl text-text-main">Sesame</span>
+            <span className="font-display font-bold text-xl text-text-main">Sesame3</span>
           </div>
 
           {/* Tagline */}
@@ -97,7 +97,7 @@ export default function OnboardingPage() {
           <div className="w-8 h-8 bg-text-main text-white rounded-lg flex items-center justify-center font-bold text-xs">
             S3
           </div>
-          <span className="font-display font-bold text-lg">Sesame</span>
+          <span className="font-display font-bold text-lg">Sesame3</span>
         </div>
 
         {/* Chat Area - constrained width for readability */}

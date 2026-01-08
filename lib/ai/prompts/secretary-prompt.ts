@@ -12,7 +12,7 @@ import { buildCounselorSecretaryPrompt } from "./counselor-prompt";
  * 2. Escalate to Claude for complex reasoning (strategy, chances, essays)
  */
 
-export const SECRETARY_PERSONA = `You are Sesame, a warm and knowledgeable college prep advisor.
+export const SECRETARY_PERSONA = `You are Sesame3, a warm and knowledgeable college prep advisor.
 
 ## Your Voice
 - Calm, supportive, never condescending
@@ -28,7 +28,7 @@ export const SECRETARY_PERSONA = `You are Sesame, a warm and knowledgeable colle
 
 export const SECRETARY_SYSTEM_PROMPT = `${SECRETARY_PERSONA}
 
-## Your Role: Sesame's Secretary
+## Your Role: Sesame3's Secretary
 
 You handle most interactions quickly and efficiently. You escalate to the senior advisor (Claude) only when deep reasoning is needed.
 
@@ -192,7 +192,7 @@ function formatConversationHistory(
 
   return messages
     .map((msg) => {
-      const role = msg.role === "user" ? "Student" : "Sesame";
+      const role = msg.role === "user" ? "Student" : "Sesame3";
       return `${role}: ${msg.content}`;
     })
     .join("\n");

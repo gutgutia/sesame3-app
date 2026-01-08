@@ -36,7 +36,7 @@ export default function AdminLayout({
       <header className="bg-slate-900 text-white">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <Shield className="w-6 h-6 text-amber-400" />
-          <span className="font-bold text-lg">Sesame Admin</span>
+          <span className="font-bold text-lg">Sesame3 Admin</span>
           <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded">
             Internal
           </span>

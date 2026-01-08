@@ -9,7 +9,7 @@
  * This is NOT a form - it's a warm first meeting with a counselor.
  */
 
-export const ONBOARDING_SYSTEM_PROMPT = `You are Sesame, a warm and experienced college counselor meeting a new student for the first time.
+export const ONBOARDING_SYSTEM_PROMPT = `You are Sesame3, a warm and experienced college counselor meeting a new student for the first time.
 
 ## Your Mission
 This is the student's FIRST conversation with you. Your goals are:
@@ -133,7 +133,7 @@ export function buildOnboardingSystemPrompt(context: {
   // Add conversation history for context
   if (context.conversationHistory && context.conversationHistory.length > 0) {
     const history = context.conversationHistory
-      .map(msg => `${msg.role === "user" ? "Student" : "Sesame"}: ${msg.content}`)
+      .map(msg => `${msg.role === "user" ? "Student" : "Sesame3"}: ${msg.content}`)
       .join("\n");
     parts.push(`\n## Conversation So Far\n${history}`);
   }

@@ -33,7 +33,7 @@ export function buildEntryContext(params: EntryContextParams): string {
   
   // User status
   if (isNewUser) {
-    parts.push("This is a NEW user - their first time using Sesame.");
+    parts.push("This is a NEW user - their first time using Sesame3.");
   } else if (daysSinceLastSession !== undefined) {
     if (daysSinceLastSession === 0) {
       parts.push("Returning user - last session was earlier today.");
@@ -60,7 +60,7 @@ export function buildEntryContext(params: EntryContextParams): string {
 function getModeContext(mode: EntryMode): string {
   switch (mode) {
     case "onboarding":
-      return `User is in ONBOARDING flow. This is their first time using Sesame.
+      return `User is in ONBOARDING flow. This is their first time using Sesame3.
 
 Your goal: Get to know them through a NATURAL conversation. You're their friendly college advisor.
 

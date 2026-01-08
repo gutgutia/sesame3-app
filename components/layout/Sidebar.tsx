@@ -222,7 +222,7 @@ export function Sidebar() {
         <div className="w-8 h-8 bg-text-main text-white rounded-lg flex items-center justify-center font-bold text-lg">
           S3
         </div>
-        <span className="font-display font-bold text-2xl text-text-main">Sesame</span>
+        <span className="font-display font-bold text-2xl text-text-main">Sesame3</span>
       </div>
 
       {/* Navigation */}

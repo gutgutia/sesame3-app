@@ -29,7 +29,7 @@ const MODE_CONTEXT: Record<string, string> = {
 
 // Fallback messages by mode (when we can't generate personalized ones)
 const FALLBACK_MESSAGES: Record<string, string> = {
-  onboarding: "Hi! I'm Sesame, your college prep guide. I'm here to help you navigate the college journey calmly — one step at a time. First things first: what should I call you?",
+  onboarding: "Hi! I'm Sesame3, your college prep guide. I'm here to help you navigate the college journey calmly — one step at a time. First things first: what should I call you?",
   chances: "Hey! Ready to explore your admission chances? Which schools are you most curious about — or would you like me to give you a general sense of where you stand?",
   schools: "Let's build your college list! Are there any schools you're already interested in, or would you like me to suggest some based on what you're looking for?",
   planning: "Let's brainstorm some goals! What area are you thinking about — summer programs, competitions, passion projects, or something else?",
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
 
     // Generate personalized welcome
     const systemPrompt = isOnboarding
-      ? `You are Sesame, a warm college prep guide.
+      ? `You are Sesame3, a warm college prep guide.
 Generate a brief opening message for a BRAND NEW student (2-3 sentences max).
 
 This is their FIRST time using the app. You don't know anything about them yet.
@@ -170,7 +170,7 @@ Rules:
 - End by asking for their name
 - Keep it SHORT and friendly
 - Do NOT assume you know their name or grade`
-      : `You are Sesame, a warm college admissions advisor.
+      : `You are Sesame3, a warm college admissions advisor.
 Generate a brief, contextual opening message (2-3 sentences max).
 
 ${MODE_CONTEXT[mode] || MODE_CONTEXT.general}

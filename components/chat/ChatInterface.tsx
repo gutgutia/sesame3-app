@@ -654,7 +654,7 @@ export function ChatInterface({
           <div className="w-8 h-8 bg-text-main text-white rounded-full flex items-center justify-center">
             <Sparkles className="w-4 h-4" />
           </div>
-          <span className="font-display font-bold text-lg text-text-main">Sesame</span>
+          <span className="font-display font-bold text-lg text-text-main">Sesame3</span>
           {isLoading && (
             <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
           )}
@@ -1006,7 +1006,7 @@ function getReentryMessage(mode: string): string | null {
  */
 function getFallbackWelcome(mode: string): string {
   const messages: Record<string, string> = {
-    onboarding: "Hi! I'm Sesame, your college prep guide. I'm here to help you navigate the college journey calmly — one step at a time. First things first: what should I call you?",
+    onboarding: "Hi! I'm Sesame3, your college prep guide. I'm here to help you navigate the college journey calmly — one step at a time. First things first: what should I call you?",
     chances: "Hey! Ready to explore your admission chances? Which schools are you most curious about — or would you like me to give you a general sense of where you stand?",
     schools: "Let's build your college list! Are there any schools you're already interested in, or would you like me to suggest some based on what you're looking for?",
     planning: "Let's brainstorm some goals! What area are you thinking about — summer programs, competitions, passion projects, or something else?",

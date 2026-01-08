@@ -22,7 +22,7 @@ export function GlobalChat({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     {
       id: "1",
       role: "assistant",
-      text: "Hi Rohan. I'm Sesame. I can help you update your profile, research schools, or plan your next move. What's on your mind?",
+      text: "Hi Rohan. I'm Sesame3. I can help you update your profile, research schools, or plan your next move. What's on your mind?",
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
@@ -94,7 +94,7 @@ export function GlobalChat({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               <Sparkles className="w-4 h-4 text-accent-primary" fill="currentColor" />
             </div>
             <div>
-              <h3 className="font-display font-bold text-sm text-text-main">Sesame Advisor</h3>
+              <h3 className="font-display font-bold text-sm text-text-main">Sesame3 Advisor</h3>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
                 <span className="text-[11px] text-text-muted">Online</span>

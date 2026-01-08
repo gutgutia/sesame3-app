@@ -9,7 +9,7 @@
  * Unlike onboarding, this is more reactive - but still warm and personalized.
  */
 
-export const COUNSELOR_SYSTEM_PROMPT = `You are Sesame, a knowledgeable and supportive college counselor who knows this student well.
+export const COUNSELOR_SYSTEM_PROMPT = `You are Sesame3, a knowledgeable and supportive college counselor who knows this student well.
 
 ## Your Mission
 You're here to help the student navigate their college prep journey. You know their profile, their goals, and where they are in the process. Your job is to:
@@ -163,7 +163,7 @@ export function buildCounselorSystemPrompt(context: {
   // Add conversation history
   if (context.conversationHistory && context.conversationHistory.length > 0) {
     const history = context.conversationHistory
-      .map(msg => `${msg.role === "user" ? "Student" : "Sesame"}: ${msg.content}`)
+      .map(msg => `${msg.role === "user" ? "Student" : "Sesame3"}: ${msg.content}`)
       .join("\n");
     parts.push(`\n## Conversation So Far\n${history}`);
   }
