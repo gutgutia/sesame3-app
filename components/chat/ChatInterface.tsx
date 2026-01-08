@@ -397,17 +397,22 @@ export function ChatInterface({
     }
   }, [messages, pendingWidgets, isLoading]);
   
-  // Handle initial message
+  // Handle initial message - wait for conversation to load first
   useEffect(() => {
     if (hasInitialized.current) return;
+    // Don't process initial message until conversation has loaded
+    // (isLoading is false and conversationId is set OR we're not loading a conversation)
+    if (isLoading) return;
+
     hasInitialized.current = true;
-    
+
     if (initialMessage) {
+      // Small delay to ensure state is settled after conversation load
       setTimeout(() => {
         sendMessage(initialMessage);
-      }, 500);
+      }, 100);
     }
-  }, [initialMessage, sendMessage]);
+  }, [initialMessage, sendMessage, isLoading]);
   
   // Get widgets to show: pending (need confirmation) and saved (show confirmation with undo)
   const currentWidgets = pendingWidgets.filter(w => w.status === "pending" || w.status === "saved");
@@ -607,14 +612,15 @@ export function ChatInterface({
                     msg.content
                   ) : (
                     // Assistant messages: render markdown
+                    // Preprocess: convert single newlines to paragraph breaks for proper rendering
                     <ReactMarkdown
                       components={{
                         // Style markdown elements
-                        p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                        p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
                         strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
                         em: ({ children }) => <em className="italic">{children}</em>,
-                        ul: ({ children }) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                        ul: ({ children }) => <ul className="list-disc list-inside mb-3 space-y-1">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal list-inside mb-3 space-y-1">{children}</ol>,
                         li: ({ children }) => <li className="ml-1">{children}</li>,
                         a: ({ href, children }) => (
                           <a href={href} className="text-accent-primary underline" target="_blank" rel="noopener noreferrer">
@@ -629,7 +635,7 @@ export function ChatInterface({
                         h3: ({ children }) => <h3 className="text-sm font-bold mb-1">{children}</h3>,
                       }}
                     >
-                      {msg.content}
+                      {normalizeMarkdownLineBreaks(msg.content)}
                     </ReactMarkdown>
                   )}
                 </div>
@@ -895,6 +901,41 @@ function getWidgetSummary(widgetType: WidgetType, data: Record<string, unknown>)
     default:
       return "Saved";
   }
+}
+
+/**
+ * Normalize markdown line breaks for proper rendering.
+ * Standard markdown ignores single newlines - this converts them to paragraph breaks.
+ * Preserves list formatting and existing double newlines.
+ */
+function normalizeMarkdownLineBreaks(content: string): string {
+  // Split into lines
+  const lines = content.split('\n');
+  const result: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const nextLine = lines[i + 1];
+
+    result.push(line);
+
+    // Add extra newline (paragraph break) if:
+    // - Not already followed by empty line
+    // - Not a list item (- or * or number.)
+    // - Next line exists and is not empty
+    // - Current line is not empty
+    if (
+      line.trim() !== '' &&
+      nextLine !== undefined &&
+      nextLine.trim() !== '' &&
+      !nextLine.trim().match(/^[-*]|\d+\./) && // Next line is not a list item
+      !line.trim().match(/^[-*]|\d+\./) // Current line is not a list item
+    ) {
+      result.push(''); // Add empty line for paragraph break
+    }
+  }
+
+  return result.join('\n');
 }
 
 /**
