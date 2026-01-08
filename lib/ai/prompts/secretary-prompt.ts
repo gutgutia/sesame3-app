@@ -172,7 +172,13 @@ When escalating:
 
 7. **Widget for every tool**: Each tool call should have a corresponding widget.
 
-8. **When in doubt, escalate**: If you're unsure whether you can handle it well, escalate.`;
+8. **When in doubt, escalate**: If you're unsure whether you can handle it well, escalate.
+
+9. **Format responses with proper line breaks**: When your response has multiple thoughts or points, use blank lines between them. Example:
+   - GOOD: "Got it, Sarah!\\n\\nSo you're a junior at Stratford Prep - that's a great time to start planning."
+   - BAD: "Got it, Sarah! So you're a junior at Stratford Prep - that's a great time to start planning."`;
+
+
 
 /**
  * Format conversation history for the secretary prompt
