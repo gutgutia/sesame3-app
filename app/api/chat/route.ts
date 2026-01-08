@@ -211,7 +211,9 @@ export async function POST(request: NextRequest) {
           if (secretaryResult?.canHandle && secretaryResult.response) {
             // === FAST PATH: Secretary (Kimi K2) handles this interaction ===
             console.log(`[Chat] 🤖 RESPONDING: Kimi K2 (Secretary) - Fast Path`);
-            console.log(`[Chat] Response preview: "${secretaryResult.response.substring(0, 80)}..."`);
+            console.log(`[Chat] === RAW SECRETARY RESPONSE START ===`);
+            console.log(JSON.stringify(secretaryResult.response));
+            console.log(`[Chat] === RAW SECRETARY RESPONSE END ===`);
             console.log(`======================================\n`);
 
             // Capture values for background tasks
@@ -322,9 +324,12 @@ export async function POST(request: NextRequest) {
             messages: validMessages,
             tools: allTools,
             onFinish: async ({ text, toolCalls, toolResults, usage }) => {
-              // Log Claude's response
+              // Log Claude's response with full text and visible newlines
               console.log(`[Chat] Claude response complete (${text.length} chars)`);
-              console.log(`[Chat] Claude response preview: "${text.substring(0, 100)}..."`);
+              console.log(`[Chat] === RAW RESPONSE START ===`);
+              // Show newlines as \n for visibility
+              console.log(JSON.stringify(text));
+              console.log(`[Chat] === RAW RESPONSE END ===`);
               if (toolCalls && toolCalls.length > 0) {
                 console.log(`[Chat] Claude tool calls: ${toolCalls.map(t => t.toolName).join(", ")}`);
               }

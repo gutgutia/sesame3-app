@@ -274,6 +274,8 @@ export function ChatInterface({
       const collectedWidgets: PendingWidget[] = [];
 
       // Read the stream - handle both SSE events and plain text
+      // SSE events are formatted as "event: widget\ndata: {...}\n\n"
+      // Plain text is sent directly without framing
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -281,44 +283,18 @@ export function ChatInterface({
         const chunk = decoder.decode(value, { stream: true });
         buffer += chunk;
 
-        // Split buffer into SSE events (separated by double newlines)
-        // Process complete events, keep incomplete ones in buffer
-        const parts = buffer.split("\n\n");
+        // Extract SSE widget events from the buffer
+        // Widget events are formatted as: "event: widget\ndata: {...}\n\n"
+        // Everything else is plain text content
+        let processedUpTo = 0;
+        const sseEventRegex = /event: widget\ndata: ([\s\S]*?)\n\n/g;
+        let match;
 
-        // Last part might be incomplete, keep it in buffer
-        buffer = parts.pop() || "";
-
-        // Process complete SSE events
-        for (const part of parts) {
-          const trimmed = part.trim();
-          if (!trimmed) continue;
-
-          // Check if this is a widget event
-          // Use [\s\S] instead of /s flag for broader compatibility
-          const widgetMatch = trimmed.match(/^event: widget\ndata: ([\s\S]+)$/);
-          if (widgetMatch) {
-            try {
-              const eventData = JSON.parse(widgetMatch[1]);
-              if (eventData.type === "widget" && eventData.widget) {
-                // Normalize widget data (parser uses satTotal/satMath/satReading, API uses total/math/reading)
-                const normalizedData = normalizeWidgetData(eventData.widget.type, eventData.widget.data);
-                // If server already saved (secretary handled), mark as "saved" instead of "pending"
-                const isSaved = eventData.saved === true;
-                const widget: PendingWidget = {
-                  id: `widget-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
-                  type: eventData.widget.type as WidgetType,
-                  data: normalizedData,
-                  status: isSaved ? "saved" : "pending",
-                };
-                collectedWidgets.push(widget);
-                console.log("[Chat] Parsed widget:", widget.type, widget.id, isSaved ? "(saved)" : "(pending)", widget.data);
-              }
-            } catch (e) {
-              console.error("[Chat] Failed to parse widget event:", e, widgetMatch[1]);
-            }
-          } else {
-            // Not a widget event - treat as text content
-            fullText += trimmed;
+        while ((match = sseEventRegex.exec(buffer)) !== null) {
+          // Add any text before this SSE event to fullText
+          const textBefore = buffer.slice(processedUpTo, match.index);
+          if (textBefore) {
+            fullText += textBefore;
             setMessages(prev =>
               prev.map(m =>
                 m.id === assistantMessage.id
@@ -327,12 +303,72 @@ export function ChatInterface({
               )
             );
           }
+
+          // Parse the widget event
+          try {
+            const eventData = JSON.parse(match[1]);
+            if (eventData.type === "widget" && eventData.widget) {
+              // Normalize widget data (parser uses satTotal/satMath/satReading, API uses total/math/reading)
+              const normalizedData = normalizeWidgetData(eventData.widget.type, eventData.widget.data);
+              // If server already saved (secretary handled), mark as "saved" instead of "pending"
+              const isSaved = eventData.saved === true;
+              const widget: PendingWidget = {
+                id: `widget-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`,
+                type: eventData.widget.type as WidgetType,
+                data: normalizedData,
+                status: isSaved ? "saved" : "pending",
+              };
+              collectedWidgets.push(widget);
+              console.log("[Chat] Parsed widget:", widget.type, widget.id, isSaved ? "(saved)" : "(pending)", widget.data);
+            }
+          } catch (e) {
+            console.error("[Chat] Failed to parse widget event:", e, match[1]);
+          }
+
+          processedUpTo = match.index + match[0].length;
+        }
+
+        // Keep only the unprocessed part in the buffer
+        // But also update fullText with any text after the last SSE event
+        const remainingText = buffer.slice(processedUpTo);
+
+        // Check if remaining text might contain start of an SSE event
+        const potentialEventStart = remainingText.indexOf("event:");
+        if (potentialEventStart === -1) {
+          // No potential SSE event, all remaining is plain text
+          if (remainingText) {
+            fullText += remainingText;
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantMessage.id
+                  ? { ...m, content: fullText }
+                  : m
+              )
+            );
+          }
+          buffer = "";
+        } else if (potentialEventStart > 0) {
+          // There's text before the potential event start
+          const textBeforeEvent = remainingText.slice(0, potentialEventStart);
+          fullText += textBeforeEvent;
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === assistantMessage.id
+                ? { ...m, content: fullText }
+                : m
+            )
+          );
+          buffer = remainingText.slice(potentialEventStart);
+        } else {
+          // Potential event starts at beginning, keep in buffer
+          buffer = remainingText;
         }
       }
 
       // Process any remaining buffer content as text
-      if (buffer.trim()) {
-        fullText += buffer.trim();
+      // (Only if it's not an incomplete SSE event)
+      if (buffer && !buffer.startsWith("event:")) {
+        fullText += buffer;
         setMessages(prev =>
           prev.map(m =>
             m.id === assistantMessage.id
@@ -905,19 +941,13 @@ function getWidgetSummary(widgetType: WidgetType, data: Record<string, unknown>)
 
 /**
  * Normalize markdown for proper rendering.
- * Very conservative - only fix obvious issues without breaking content.
+ * Now that we preserve newlines from the stream, this is mostly a passthrough.
+ * Only handles edge cases where formatting might still be off.
  */
 function normalizeMarkdownLineBreaks(content: string): string {
-  // Only fix: add line break before numbered lists (1. 2. 3.) that are stuck to previous text
-  // e.g., "something)1. First item" → "something)\n\n1. First item"
-  let result = content.replace(/([.!?)])\s*(\d+\.\s+\*\*)/g, '$1\n\n$2');
-
-  // Add break before bold section headers that follow punctuation with no space
-  // e.g., "end.**Section:**" → "end.\n\n**Section:**"
-  // Only match ** followed by word and colon (section headers)
-  result = result.replace(/([.!?)])\s*(\*\*[A-Za-z][^*]+:\*\*)/g, '$1\n\n$2');
-
-  return result;
+  // The streaming fix now preserves newlines properly.
+  // This function is kept for any edge case handling if needed.
+  return content;
 }
 
 /**
