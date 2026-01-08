@@ -659,11 +659,11 @@ export function ChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-bg-sidebar">
       {/* Header */}
-      <div className="h-14 flex items-center justify-between px-4 md:px-6 bg-white/60 backdrop-blur-sm sticky top-0 z-10">
+      <div className="h-14 flex items-center justify-between px-4 md:px-8 bg-white border-b border-border-subtle">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-gradient-to-br from-accent-primary to-accent-primary/80 text-white rounded-xl flex items-center justify-center shadow-sm">
+          <div className="w-8 h-8 bg-accent-primary text-white rounded-lg flex items-center justify-center">
             <Sparkles className="w-4 h-4" />
           </div>
           <div>
@@ -688,8 +688,9 @@ export function ChatInterface({
         </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4" ref={scrollRef}>
+      {/* Messages - centered with max width */}
+      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
+        <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-4">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -812,10 +813,11 @@ export function ChatInterface({
             </div>
           </div>
         )}
+        </div>
       </div>
 
       {/* Input Area */}
-      <div className="p-4 md:px-6 md:pb-6 bg-gradient-to-t from-white via-white to-transparent pt-2">
+      <div className="p-4 md:px-8 bg-white border-t border-border-subtle">
         <form onSubmit={handleSubmit} className="relative max-w-3xl mx-auto">
           <input
             ref={inputRef}
@@ -823,14 +825,14 @@ export function ChatInterface({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask me anything..."
-            className="w-full bg-white border border-border-subtle rounded-2xl pl-5 pr-14 py-3.5 text-[15px] shadow-sm focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-surface/50 transition-all placeholder:text-text-muted/60"
+            className="w-full bg-bg-sidebar border border-border-subtle rounded-xl pl-5 pr-14 py-3 text-[15px] focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-surface/50 transition-all placeholder:text-text-muted/60"
             disabled={isLoading || hasBlockingWidgets}
             autoFocus
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading || hasBlockingWidgets}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-accent-primary text-white rounded-xl hover:bg-accent-primary/90 disabled:opacity-40 disabled:bg-text-muted transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 disabled:opacity-40 disabled:bg-text-muted transition-colors"
           >
             <Send className="w-4 h-4" />
           </button>

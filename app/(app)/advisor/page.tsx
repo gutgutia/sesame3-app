@@ -61,18 +61,13 @@ function AdvisorContent() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-10rem)] md:h-[calc(100vh-4rem)] bg-gradient-to-b from-bg-sidebar/50 to-bg-app -mx-4 md:-mx-10 -mt-4 md:-mt-6">
-      {/* Chat Interface - centered with max width */}
-      <div className="flex-1 flex flex-col items-center min-h-0 overflow-hidden">
-        <div className="w-full max-w-3xl flex-1 flex flex-col overflow-hidden">
-          <ChatInterface
-            mode={mode}
-            initialMessage={initialQuery || undefined}
-            onProfileUpdate={handleProfileUpdate}
-            preloadedWelcome={welcomeMessage}
-          />
-        </div>
-      </div>
+    <div className="h-[calc(100vh-10rem)] md:h-[calc(100vh-5rem)] -mx-4 md:-mx-10 -mt-4 md:-mt-6 -mb-24 md:-mb-10">
+      <ChatInterface
+        mode={mode}
+        initialMessage={initialQuery || undefined}
+        onProfileUpdate={handleProfileUpdate}
+        preloadedWelcome={welcomeMessage}
+      />
     </div>
   );
 }
