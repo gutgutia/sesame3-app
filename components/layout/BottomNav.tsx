@@ -6,7 +6,7 @@ import { LayoutGrid, Compass, User, BookOpen, MessageSquare } from "lucide-react
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { name: "Home", href: "/", icon: LayoutGrid, matchPaths: ["/"] },
+  { name: "Home", href: "/dashboard", icon: LayoutGrid, matchPaths: ["/dashboard"] },
   { name: "Advisor", href: "/advisor", icon: MessageSquare, matchPaths: ["/advisor"] },
   { name: "Plan", href: "/plan", icon: Compass, matchPaths: ["/plan"] },
   { name: "Profile", href: "/profile", icon: User, matchPaths: ["/profile"] },
