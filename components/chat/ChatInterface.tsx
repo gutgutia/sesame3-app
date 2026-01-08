@@ -119,13 +119,28 @@ export function ChatInterface({
         // If resuming an existing conversation with messages, load them
         if (!conversation.isNew && conversation.messages.length > 0) {
           setIsResumedConversation(true);
-          setMessages(
-            conversation.messages.map((m) => ({
-              id: m.id,
-              role: m.role as "user" | "assistant",
-              content: m.content,
-            }))
-          );
+
+          const loadedMessages = conversation.messages.map((m) => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+          }));
+
+          // If coming from a specific entry point (not general), add a contextual re-entry message
+          // This acknowledges WHY the user came back (e.g., clicked "Need ideas?" from planning)
+          if (mode !== "general" && mode !== "onboarding") {
+            const reentryMessage = getReentryMessage(mode);
+            if (reentryMessage) {
+              loadedMessages.push({
+                id: `reentry-${Date.now()}`,
+                role: "assistant",
+                content: reentryMessage,
+              });
+              console.log(`[Chat] Added re-entry message for mode: ${mode}`);
+            }
+          }
+
+          setMessages(loadedMessages);
           console.log(
             `[Chat] Resumed conversation ${conversation.id} with ${conversation.messages.length} messages in ${Date.now() - startTime}ms`
           );
@@ -948,6 +963,21 @@ function normalizeMarkdownLineBreaks(content: string): string {
   // The streaming fix now preserves newlines properly.
   // This function is kept for any edge case handling if needed.
   return content;
+}
+
+/**
+ * Get a contextual re-entry message when user returns to chat from a specific page.
+ * This acknowledges WHY they came back (e.g., clicked "Need ideas?" from planning).
+ */
+function getReentryMessage(mode: string): string | null {
+  const messages: Record<string, string> = {
+    planning: "Back for some goal brainstorming? What area would you like to focus on — summer programs, competitions, projects, or something else?",
+    schools: "Looking to work on your school list? Are there specific schools you want to explore, or would you like some suggestions?",
+    chances: "Want to check your chances somewhere? Which schools are you curious about?",
+    profile: "Ready to update your profile? What would you like to add — activities, awards, test scores?",
+    story: "Want to work on your story? Tell me about something you're passionate about or what makes you unique.",
+  };
+  return messages[mode] || null;
 }
 
 /**
