@@ -1,11 +1,12 @@
 // AI Module - Main exports
 
 // Model providers
-export { 
-  models, 
-  modelFor, 
-  getAvailableProviders, 
+export {
+  models,
+  modelFor,
+  getAvailableProviders,
   getModelWithFallback,
+  canEscalateToAdvisor,
   getAdvisorForTier,
   getAdvisorModelName,
   getTierModelType,

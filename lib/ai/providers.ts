@@ -81,49 +81,49 @@ export const modelFor = {
 export type SubscriptionTier = "free" | "standard" | "premium";
 
 /**
- * Get the advisor model for a subscription tier.
- * 
- * - Free: Haiku 4.5 (fast, basic advice)
- * - Standard ($10/mo): Sonnet 4.5 (deep reasoning)
+ * Check if a tier allows escalation to Claude models.
+ *
+ * - Free: Kimi K2 only, no escalation
+ * - Standard ($10/mo): Kimi K2 only, no escalation
+ * - Premium ($25/mo): Kimi K2 + Opus for complex reasoning
+ *
+ * Kimi K2 is Sonnet-equivalent quality, so Free/Standard get great responses.
+ * Premium users get Opus for the most complex analysis (chances, essays, strategy).
+ */
+export function canEscalateToAdvisor(tier: SubscriptionTier): boolean {
+  return tier === "premium";
+}
+
+/**
+ * Get the advisor model for a subscription tier (only used when escalating).
+ *
+ * - Free: N/A (no escalation, Kimi handles everything)
+ * - Standard: N/A (no escalation, Kimi handles everything)
  * - Premium ($25/mo): Opus 4.5 (exceptional reasoning)
  */
 export function getAdvisorForTier(tier: SubscriptionTier) {
-  switch (tier) {
-    case "free":
-      return models.claude.haiku;
-    case "standard":
-      return models.claude.sonnet;
-    case "premium":
-      return models.claude.opus;
-  }
+  // Only premium gets Claude escalation, and it's always Opus
+  return models.claude.opus;
 }
 
 /**
  * Get the model name string for a tier (for logging/tracking).
  */
 export function getAdvisorModelName(tier: SubscriptionTier): string {
-  switch (tier) {
-    case "free":
-      return "claude-haiku-4-5";
-    case "standard":
-      return "claude-sonnet-4-5";
-    case "premium":
-      return "claude-opus-4-5";
+  if (tier === "premium") {
+    return "claude-opus-4-5";
   }
+  return "kimi-k2";
 }
 
 /**
  * Map tier to usage tracking model type.
  */
-export function getTierModelType(tier: SubscriptionTier): "haiku" | "sonnet" | "opus" {
-  switch (tier) {
-    case "free":
-      return "haiku";
-    case "standard":
-      return "sonnet";
-    case "premium":
-      return "opus";
+export function getTierModelType(tier: SubscriptionTier): "kimi_k2" | "opus" {
+  if (tier === "premium") {
+    return "opus";
   }
+  return "kimi_k2";
 }
 
 // =============================================================================

@@ -90,18 +90,21 @@ Example with high school (note widget type is "highschool", not "high_school"):
 }
 \`\`\`
 
-When escalating:
+When escalating (IMPORTANT: Still provide a response - premium users get deeper analysis, others see your response):
 
 \`\`\`json
 {
   "canHandle": false,
   "escalationReason": "User is asking for strategic advice about ED vs EA timing",
+  "response": "Great question about ED vs EA timing! Let me think through this with you...",
   "tools": [],
   "widgets": [],
   "entities": [],
   "intents": ["question_strategy"]
 }
 \`\`\`
+
+**Always include a "response" field**, even when escalating. This response should be your best attempt at answering. For premium users, a senior advisor may provide deeper analysis, but your response ensures everyone gets help.
 
 ## Available Tools & Widget Types
 

@@ -9,6 +9,7 @@ import {
   callSecretary,
   shouldParse,
   formatParserContextForAdvisor,
+  canEscalateToAdvisor,
   getAdvisorForTier,
   getAdvisorModelName,
   getTierModelType,
@@ -208,17 +209,29 @@ export async function POST(request: NextRequest) {
           // ==========================================================================
           // ROUTING DECISION: Secretary handles vs Claude escalation
           // ==========================================================================
-          if (secretaryResult?.canHandle && secretaryResult.response) {
+          //
+          // Decision logic:
+          // 1. Secretary says canHandle: true + has response → Kimi handles
+          // 2. Secretary says canHandle: false BUT tier can't escalate → Kimi handles (use secretary response)
+          // 3. Secretary says canHandle: false AND tier can escalate → Claude handles
+          //
+          // This ensures free/standard users always get Kimi, premium users get Claude for complex questions.
+          const secretaryCanHandle = secretaryResult?.canHandle && secretaryResult.response;
+          const forceKimiDueToTier = !canEscalateToAdvisor(tier) && secretaryResult?.response;
+
+          if (secretaryCanHandle || forceKimiDueToTier) {
             // === FAST PATH: Secretary (Kimi K2) handles this interaction ===
-            console.log(`[Chat] 🤖 RESPONDING: Kimi K2 (Secretary) - Fast Path`);
+            // At this point, secretaryResult is guaranteed to exist and have a response
+            const responseText = secretaryResult!.response!;
+            const toolsToExecute = secretaryResult!.tools || [];
+            const reason = forceKimiDueToTier && !secretaryResult!.canHandle
+              ? "Tier restricted (free/standard)"
+              : "Fast Path";
+            console.log(`[Chat] 🤖 RESPONDING: Kimi K2 (Secretary) - ${reason}`);
             console.log(`[Chat] === RAW SECRETARY RESPONSE START ===`);
-            console.log(JSON.stringify(secretaryResult.response));
+            console.log(JSON.stringify(responseText));
             console.log(`[Chat] === RAW SECRETARY RESPONSE END ===`);
             console.log(`======================================\n`);
-
-            // Capture values for background tasks
-            const responseText = secretaryResult.response;
-            const toolsToExecute = secretaryResult.tools || [];
 
             // Stream secretary's response IMMEDIATELY (no blocking operations!)
             controller.enqueue(encoder.encode(responseText));
@@ -265,11 +278,12 @@ export async function POST(request: NextRequest) {
             return;
           }
 
-          // === SLOW PATH: Escalate to Claude for complex reasoning ===
-          console.log(`[Chat] 🧠 RESPONDING: Claude (${modelName}) - Slow Path`);
+          // === SLOW PATH: Escalate to Claude for complex reasoning (Premium tier only) ===
+          console.log(`[Chat] 🧠 RESPONDING: Claude Opus (${modelName}) - Premium Escalation`);
           if (secretaryResult && !secretaryResult.canHandle) {
             console.log(`[Chat] Escalation reason: ${secretaryResult.escalationReason || "complex reasoning needed"}`);
           }
+          console.log(`[Chat] User tier: ${tier} (escalation allowed: ${canEscalateToAdvisor(tier)})`);
           console.log(`======================================\n`);
 
           // === Get context (use lightweight for onboarding, full for everything else) ===

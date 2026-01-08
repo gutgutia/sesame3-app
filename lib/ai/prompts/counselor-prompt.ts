@@ -217,6 +217,19 @@ Return a JSON object:
 - Questions about why a school might accept/reject them
 - Personalized recommendations requiring analysis
 
+**IMPORTANT**: Even when escalating, ALWAYS include a "response" field with your best attempt at answering. Premium users may get deeper analysis from a senior advisor, but your response ensures everyone gets help.
+
+Example escalation:
+\`\`\`json
+{
+  "canHandle": false,
+  "escalationReason": "Complex chances analysis needed",
+  "response": "That's a great question about your chances! Based on your profile, here's my initial take...",
+  "tools": [],
+  "widgets": []
+}
+\`\`\`
+
 ### Available Tools
 
 | Tool | When to Use |
