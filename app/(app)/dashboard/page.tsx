@@ -169,7 +169,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <CTACard
-              href="/advisor?mode=profile"
+              href="/profile"
               icon={GraduationCap}
               title="Build Profile"
               description="Add your GPA, test scores, activities, and awards."
@@ -181,7 +181,7 @@ export default function DashboardPage() {
               description="See how you stack up at dream schools."
             />
             <CTACard
-              href="/advisor?mode=schools"
+              href="/schools"
               icon={School}
               title="Build School List"
               description="Add schools, get suggestions, balance your list."
@@ -212,7 +212,7 @@ export default function DashboardPage() {
               <FilledSchoolsCard schoolList={profile?.schoolList || []} />
             ) : (
               <MiniCTACard
-                href="/advisor?mode=schools"
+                href="/schools"
                 icon={School}
                 title="Build Your School List"
                 description="Add schools to start seeing match analysis."
@@ -224,7 +224,7 @@ export default function DashboardPage() {
               <FilledProfileCard profile={profile} />
             ) : (
               <MiniCTACard
-                href="/advisor?mode=profile"
+                href="/profile"
                 icon={GraduationCap}
                 title="Build Your Profile"
                 description="Add GPA, test scores, and activities."
@@ -236,7 +236,7 @@ export default function DashboardPage() {
               <FilledGoalsCard goals={profile?.goals || []} />
             ) : (
               <MiniCTACard
-                href="/advisor?mode=planning"
+                href="/plan"
                 icon={Calendar}
                 title="Set Your Goals"
                 description="Plan your path to success."
