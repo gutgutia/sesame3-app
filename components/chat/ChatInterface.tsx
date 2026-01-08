@@ -1,8 +1,7 @@
 "use client";
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
-import { Send, ArrowLeft, Sparkles } from "lucide-react";
-import Link from "next/link";
+import { Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { ConfirmationWidget, WidgetType } from "./ConfirmationWidget";
@@ -662,26 +661,35 @@ export function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="h-16 flex items-center px-6 border-b border-border-subtle bg-white/80 backdrop-blur-sm sticky top-0 z-10">
-        <Link
-          href="/"
-          className="mr-4 p-2 hover:bg-bg-sidebar rounded-full transition-colors text-text-muted"
-        >
-          <ArrowLeft className="w-5 h-5" />
-        </Link>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-text-main text-white rounded-full flex items-center justify-center">
+      <div className="h-14 flex items-center justify-between px-4 md:px-6 bg-white/60 backdrop-blur-sm sticky top-0 z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-gradient-to-br from-accent-primary to-accent-primary/80 text-white rounded-xl flex items-center justify-center shadow-sm">
             <Sparkles className="w-4 h-4" />
           </div>
-          <span className="font-display font-bold text-lg text-text-main">Sesame3</span>
+          <div>
+            <h1 className="font-semibold text-text-main text-sm">AI Advisor</h1>
+            <p className="text-xs text-text-muted">
+              {mode === "schools" ? "School list help" :
+               mode === "chances" ? "Admission chances" :
+               mode === "planning" ? "Goal planning" :
+               mode === "profile" ? "Profile updates" :
+               mode === "story" ? "Your story" :
+               "Ask me anything"}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
           {isLoading && (
-            <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+            <span className="flex items-center gap-1.5 text-xs text-text-muted">
+              <span className="w-1.5 h-1.5 rounded-full bg-accent-primary animate-pulse" />
+              Thinking
+            </span>
           )}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-6 space-y-4" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4" ref={scrollRef}>
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -691,10 +699,10 @@ export function ChatInterface({
               {msg.content && (
                 <div
                   className={cn(
-                    "rounded-2xl px-5 py-3 text-[15px] leading-relaxed",
+                    "rounded-2xl px-4 py-3 text-[15px] leading-relaxed",
                     msg.role === "user"
-                      ? "bg-text-main text-white rounded-br-sm whitespace-pre-wrap"
-                      : "bg-white border border-border-subtle text-text-main rounded-bl-sm shadow-sm"
+                      ? "bg-text-main text-white rounded-br-md whitespace-pre-wrap"
+                      : "bg-white text-text-main rounded-bl-md shadow-sm"
                   )}
                 >
                   {msg.role === "user" ? (
@@ -737,10 +745,10 @@ export function ChatInterface({
         {/* Typing indicator */}
         {isLoading && messages[messages.length - 1]?.role !== "assistant" && (
           <div className="flex justify-start">
-            <div className="bg-white border border-border-subtle rounded-2xl rounded-bl-sm px-5 py-4 shadow-sm flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
-              <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce [animation-delay:-0.15s]" />
-              <span className="w-1.5 h-1.5 bg-text-muted/40 rounded-full animate-bounce" />
+            <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 bg-accent-primary/50 rounded-full animate-bounce [animation-delay:-0.3s]" />
+              <span className="w-1.5 h-1.5 bg-accent-primary/50 rounded-full animate-bounce [animation-delay:-0.15s]" />
+              <span className="w-1.5 h-1.5 bg-accent-primary/50 rounded-full animate-bounce" />
             </div>
           </div>
         )}
@@ -807,22 +815,22 @@ export function ChatInterface({
       </div>
 
       {/* Input Area */}
-      <div className="p-4 md:p-6 bg-white border-t border-border-subtle">
+      <div className="p-4 md:px-6 md:pb-6 bg-gradient-to-t from-white via-white to-transparent pt-2">
         <form onSubmit={handleSubmit} className="relative max-w-3xl mx-auto">
           <input
             ref={inputRef}
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="What's on your mind?"
-            className="w-full bg-bg-sidebar border border-border-medium rounded-xl pl-5 pr-14 py-4 text-[15px] focus:outline-none focus:border-accent-primary focus:ring-4 focus:ring-accent-surface transition-all"
+            placeholder="Ask me anything..."
+            className="w-full bg-white border border-border-subtle rounded-2xl pl-5 pr-14 py-3.5 text-[15px] shadow-sm focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-surface/50 transition-all placeholder:text-text-muted/60"
             disabled={isLoading || hasBlockingWidgets}
             autoFocus
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading || hasBlockingWidgets}
-            className="absolute right-2.5 top-1/2 -translate-y-1/2 p-2.5 bg-text-main text-white rounded-lg hover:bg-black/80 disabled:opacity-40 transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-accent-primary text-white rounded-xl hover:bg-accent-primary/90 disabled:opacity-40 disabled:bg-text-muted transition-colors"
           >
             <Send className="w-4 h-4" />
           </button>
