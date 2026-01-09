@@ -47,18 +47,23 @@ const SchoolRecommendationSchema = z.object({
 export async function generateSchoolRecommendations(
   input: RecommendationInput
 ): Promise<GeneratedRecommendation[]> {
+  const startTime = Date.now();
   const { profile, stage, preferences } = input;
+
+  console.log(`[SchoolAgent] Starting school recommendations for ${profile.firstName}`);
 
   // Load all schools from database
   const allSchools = await loadSchoolsFromDatabase();
+  console.log(`[SchoolAgent] Found ${allSchools.length} schools in database`);
 
   // Filter out schools already on the student's list
   const availableSchools = allSchools.filter(
     (school) => !profile.existingSchoolIds.includes(school.id)
   );
+  console.log(`[SchoolAgent] ${availableSchools.length} schools available after filtering (${profile.existingSchoolIds.length} already on list)`);
 
   if (availableSchools.length === 0) {
-    console.log("No available schools to recommend (all are on list or DB is empty)");
+    console.log("[SchoolAgent] No available schools to recommend (all are on list or DB is empty)");
     return [];
   }
 
@@ -77,7 +82,7 @@ export async function generateSchoolRecommendations(
 
     // Convert to GeneratedRecommendation format
     // Only include recommendations for schools that exist in our database
-    return object.recommendations
+    const recommendations = object.recommendations
       .filter((rec) => schoolMap.has(rec.schoolId))
       .map((rec) => ({
         category: "school" as const,
@@ -90,8 +95,11 @@ export async function generateSchoolRecommendations(
         relevantGrade: stage.grade,
         schoolId: rec.schoolId,
       }));
+
+    console.log(`[SchoolAgent] Generated ${recommendations.length} school recommendations in ${Date.now() - startTime}ms`);
+    return recommendations;
   } catch (error) {
-    console.error("Error generating school recommendations:", error);
+    console.error("[SchoolAgent] Error generating school recommendations:", error);
     return [];
   }
 }

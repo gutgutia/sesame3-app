@@ -42,17 +42,23 @@ const ProgramRecommendationSchema = z.object({
 export async function generateProgramRecommendations(
   input: RecommendationInput
 ): Promise<GeneratedRecommendation[]> {
+  const startTime = Date.now();
   const { profile, stage, preferences } = input;
+
+  console.log(`[ProgramAgent] Starting program recommendations for ${profile.firstName}`);
 
   // Don't recommend programs to seniors in winter/spring (too late)
   if (stage.stage === "senior_spring" || stage.stage === "senior_winter") {
+    console.log("[ProgramAgent] Skipping - too late for seniors");
     return [];
   }
 
   // Get eligible programs from database
   const eligiblePrograms = await getEligiblePrograms(profile, stage);
+  console.log(`[ProgramAgent] Found ${eligiblePrograms.length} eligible programs in database`);
 
   if (eligiblePrograms.length === 0) {
+    console.log("[ProgramAgent] No eligible programs found");
     return [];
   }
 
@@ -76,7 +82,7 @@ export async function generateProgramRecommendations(
       eligiblePrograms.map((p) => [p.id, p])
     );
 
-    return object.recommendations
+    const recommendations = object.recommendations
       .filter((rec) => programMap.has(rec.programId))
       .map((rec) => {
         const program = programMap.get(rec.programId)!;
@@ -93,8 +99,11 @@ export async function generateProgramRecommendations(
           expiresAt: program.applicationDeadline || undefined,
         };
       });
+
+    console.log(`[ProgramAgent] Generated ${recommendations.length} program recommendations in ${Date.now() - startTime}ms`);
+    return recommendations;
   } catch (error) {
-    console.error("Error generating program recommendations:", error);
+    console.error("[ProgramAgent] Error generating program recommendations:", error);
     return [];
   }
 }

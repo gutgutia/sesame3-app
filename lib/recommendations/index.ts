@@ -41,11 +41,15 @@ interface GenerateRecommendationsResult {
 export async function generateRecommendations(
   profileId: string
 ): Promise<GenerateRecommendationsResult> {
+  const startTime = Date.now();
+  console.log(`[Recommendations] Starting recommendation generation for profile ${profileId}`);
+
   // Load profile data
   const profile = await loadProfileSnapshot(profileId);
   if (!profile) {
     throw new Error("Profile not found");
   }
+  console.log(`[Recommendations] Profile loaded in ${Date.now() - startTime}ms`);
 
   // Calculate current stage - use stored grade if available
   const stage = getStudentStage(profile.graduationYear, { grade: profile.grade });
@@ -60,21 +64,23 @@ export async function generateRecommendations(
     preferences,
   };
 
+  console.log(`[Recommendations] Stage: ${stage.stage}, Grade: ${stage.grade}, Season: ${stage.season}`);
+  console.log(`[Recommendations] Relevant types: ${stage.recommendationTypes.join(", ")}`);
+
   // Generate recommendations in parallel based on stage
-  const promises: Promise<GeneratedRecommendation[]>[] = [];
+  // Track which promises we're adding to correctly index results
+  const schoolRelevant = isRecommendationTypeRelevant("school", stage);
+  const programRelevant = isRecommendationTypeRelevant("program", stage);
 
-  if (isRecommendationTypeRelevant("school", stage)) {
-    promises.push(generateSchoolRecommendations(input));
-  }
+  console.log(`[Recommendations] School relevant: ${schoolRelevant}, Program relevant: ${programRelevant}`);
 
-  if (isRecommendationTypeRelevant("program", stage)) {
-    promises.push(generateProgramRecommendations(input));
-  }
+  // Run relevant agents in parallel
+  const [schoolRecs, programRecs] = await Promise.all([
+    schoolRelevant ? generateSchoolRecommendations(input) : Promise.resolve([]),
+    programRelevant ? generateProgramRecommendations(input) : Promise.resolve([]),
+  ]);
 
-  // Wait for all agents
-  const results = await Promise.all(promises);
-  const schoolRecs = results[0] || [];
-  const programRecs = results[1] || [];
+  console.log(`[Recommendations] Generated: ${schoolRecs.length} school, ${programRecs.length} program recs`);
 
   // Generate general recommendations via master agent
   const generalRecs = await consolidateRecommendations({
@@ -96,6 +102,8 @@ export async function generateRecommendations(
     allRecommendations,
     createProfileHash(profile)
   );
+
+  console.log(`[Recommendations] Total: ${allRecommendations.length} recommendations saved in ${Date.now() - startTime}ms`);
 
   return {
     recommendations: allRecommendations,

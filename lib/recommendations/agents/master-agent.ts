@@ -40,9 +40,12 @@ interface ConsolidationInput {
 export async function consolidateRecommendations(
   consolidationInput: ConsolidationInput
 ): Promise<GeneratedRecommendation[]> {
+  const startTime = Date.now();
   const { input, schoolRecommendations, programRecommendations } =
     consolidationInput;
   const { profile, stage } = input;
+
+  console.log(`[MasterAgent] Starting consolidation with ${schoolRecommendations.length} school and ${programRecommendations.length} program recs`);
 
   // Build the consolidation prompt
   const prompt = buildConsolidationPrompt(
@@ -54,7 +57,7 @@ export async function consolidateRecommendations(
 
   try {
     const { object } = await generateObject({
-      model: modelFor.fast, // Use fast model for consolidation
+      model: modelFor.fastParsing, // Use Kimi K2
       schema: MasterRecommendationSchema,
       prompt,
     });
@@ -71,9 +74,10 @@ export async function consolidateRecommendations(
         displayOrder: index,
       }));
 
+    console.log(`[MasterAgent] Generated ${generalRecs.length} general recommendations in ${Date.now() - startTime}ms`);
     return generalRecs;
   } catch (error) {
-    console.error("Error consolidating recommendations:", error);
+    console.error("[MasterAgent] Error consolidating recommendations:", error);
     return [];
   }
 }

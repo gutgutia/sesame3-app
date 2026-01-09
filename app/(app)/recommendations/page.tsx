@@ -413,8 +413,7 @@ function RecommendationCard({
   onSave: () => void;
   onAddToList: () => void;
 }) {
-  const [showAllSteps, setShowAllSteps] = useState(false);
-  const [expandedReasoning, setExpandedReasoning] = useState(false);
+  const [showNextSteps, setShowNextSteps] = useState(false);
 
   // Match level colors (High match = green/good, Low match = yellow/uncertain)
   const matchLevelColors = {
@@ -432,8 +431,7 @@ function RecommendationCard({
 
   const CategoryIcon = categoryIcons[recommendation.category];
   const isSaved = recommendation.status === "saved";
-  const hasMoreSteps = recommendation.actionItems.length > 2;
-  const visibleSteps = showAllSteps ? recommendation.actionItems : recommendation.actionItems.slice(0, 2);
+  const hasNextSteps = recommendation.actionItems.length > 0;
 
   return (
     <div
@@ -492,65 +490,52 @@ function RecommendationCard({
         <p className="text-sm text-text-muted mb-3">{recommendation.subtitle}</p>
       )}
 
-      {/* Reasoning */}
+      {/* Why - Full reasoning, no truncation */}
       <div className="mb-4">
-        <p
-          className={cn(
-            "text-sm text-text-main",
-            !expandedReasoning && "line-clamp-3"
-          )}
-        >
+        <p className="text-sm text-text-main leading-relaxed">
           {recommendation.reasoning}
         </p>
-        {recommendation.reasoning.length > 150 && (
-          <button
-            onClick={() => setExpandedReasoning(!expandedReasoning)}
-            className="text-xs text-accent-primary hover:underline mt-1"
-          >
-            {expandedReasoning ? "Show less" : "Read more"}
-          </button>
-        )}
       </div>
 
-
-      {/* Action Items */}
-      {recommendation.actionItems.length > 0 && (
-        <div className="border-t border-border-subtle pt-3 mt-3">
-          <h4 className="text-xs font-medium text-text-muted mb-2">
-            Next Steps
-          </h4>
-          <ul className="space-y-1">
-            {visibleSteps.map((item, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <ChevronRight className="w-3 h-3 mt-1 text-text-muted shrink-0" />
-                <span className="text-text-main">{item}</span>
-              </li>
-            ))}
-          </ul>
-          {hasMoreSteps && (
-            <button
-              onClick={() => setShowAllSteps(!showAllSteps)}
-              className="text-xs text-accent-primary hover:underline mt-2 flex items-center gap-1"
-            >
-              {showAllSteps ? (
-                <>Show less</>
-              ) : (
-                <>+{recommendation.actionItems.length - 2} more</>
-              )}
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Expiry */}
+      {/* Expiry - show inline if present */}
       {recommendation.expiresAt && (
-        <div className="flex items-center gap-1 text-xs text-text-muted mt-3">
+        <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-lg w-fit mb-3">
           <Clock className="w-3 h-3" />
           Deadline:{" "}
           {new Date(recommendation.expiresAt).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
           })}
+        </div>
+      )}
+
+      {/* Next Steps - Collapsed by default */}
+      {hasNextSteps && (
+        <div className="border-t border-border-subtle pt-3 mt-3">
+          <button
+            onClick={() => setShowNextSteps(!showNextSteps)}
+            className="flex items-center justify-between w-full text-sm font-medium text-text-muted hover:text-text-main transition-colors"
+          >
+            <span>Next Steps ({recommendation.actionItems.length})</span>
+            <ChevronRight
+              className={cn(
+                "w-4 h-4 transition-transform",
+                showNextSteps && "rotate-90"
+              )}
+            />
+          </button>
+          {showNextSteps && (
+            <ul className="mt-3 space-y-2">
+              {recommendation.actionItems.map((item, i) => (
+                <li key={i} className="flex items-start gap-2 text-sm">
+                  <div className="w-5 h-5 rounded-full bg-accent-surface flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-xs font-medium text-accent-primary">{i + 1}</span>
+                  </div>
+                  <span className="text-text-main">{item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
