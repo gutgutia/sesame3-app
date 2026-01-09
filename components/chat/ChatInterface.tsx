@@ -659,9 +659,9 @@ export function ChatInterface({
   };
 
   return (
-    <div className="flex flex-col h-full bg-bg-sidebar">
+    <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="h-14 flex items-center justify-between px-4 md:px-8 bg-white border-b border-border-subtle">
+      <div className="h-14 flex items-center justify-between px-4 md:px-8 border-b border-border-subtle/50">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-accent-primary text-white rounded-lg flex items-center justify-center">
             <Sparkles className="w-4 h-4" />
@@ -689,8 +689,8 @@ export function ChatInterface({
       </div>
 
       {/* Messages - centered with max width */}
-      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
-        <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-4">
+      <div className="flex-1 overflow-y-auto bg-gray-50/50" ref={scrollRef}>
+        <div className="max-w-3xl mx-auto p-4 md:py-6 md:px-8 space-y-4">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -817,7 +817,7 @@ export function ChatInterface({
       </div>
 
       {/* Input Area */}
-      <div className="p-4 md:px-8 bg-white border-t border-border-subtle">
+      <div className="p-4 md:px-8 md:py-4 bg-white border-t border-border-subtle/50">
         <form onSubmit={handleSubmit} className="relative max-w-3xl mx-auto">
           <input
             ref={inputRef}
@@ -825,14 +825,14 @@ export function ChatInterface({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask me anything..."
-            className="w-full bg-bg-sidebar border border-border-subtle rounded-xl pl-5 pr-14 py-3 text-[15px] focus:outline-none focus:border-accent-primary focus:ring-2 focus:ring-accent-surface/50 transition-all placeholder:text-text-muted/60"
+            className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-5 pr-14 py-3 text-[15px] focus:outline-none focus:border-accent-primary focus:bg-white focus:ring-2 focus:ring-accent-surface/50 transition-all placeholder:text-text-muted/60"
             disabled={isLoading || hasBlockingWidgets}
             autoFocus
           />
           <button
             type="submit"
             disabled={!input.trim() || isLoading || hasBlockingWidgets}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 disabled:opacity-40 disabled:bg-text-muted transition-colors"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-accent-primary text-white rounded-lg hover:bg-accent-primary/90 disabled:opacity-40 disabled:bg-gray-300 transition-colors"
           >
             <Send className="w-4 h-4" />
           </button>

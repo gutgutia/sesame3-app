@@ -61,7 +61,7 @@ function AdvisorContent() {
   };
 
   return (
-    <div className="h-[calc(100vh-10rem)] md:h-[calc(100vh-5rem)] -mx-4 md:-mx-10 -mt-4 md:-mt-6 -mb-24 md:-mb-10">
+    <div className="h-[calc(100vh-3.5rem)] md:h-screen -mx-4 md:-mx-10 -mt-4 md:-mt-10 -mb-24 md:-mb-10">
       <ChatInterface
         mode={mode}
         initialMessage={initialQuery || undefined}
