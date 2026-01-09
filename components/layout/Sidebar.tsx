@@ -18,7 +18,6 @@ import {
   Trophy,
   Briefcase,
   BookOpenCheck,
-  MessageSquare,
   Lightbulb,
   Shield,
   Sparkles,
@@ -54,14 +53,9 @@ const navItems: NavItem[] = [
   { name: "Schools", href: "/schools", icon: BookOpen },
   { name: "Opportunities", href: "/opportunities", icon: GraduationCap },
   { name: "Plan", href: "/plan", icon: Compass },
+  { name: "Recommendations", href: "/recommendations", icon: Target },
+  { name: "AI Advisor", href: "/advisor", icon: Sparkles },
 ];
-
-// Advisor is separate - cross-cutting feature with special treatment
-const advisorItem: NavItem = {
-  name: "AI Advisor",
-  href: "/advisor",
-  icon: Sparkles,
-};
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -224,35 +218,6 @@ export function Sidebar() {
       {/* Navigation */}
       <nav className="flex flex-col gap-2 flex-1 overflow-y-auto">
         {navItems.map((item) => renderNavItem(item))}
-
-        {/* Advisor - Visually distinct but part of main nav */}
-        <div className="mt-3 pt-3 border-t border-border-subtle/50">
-          <Link
-            href={advisorItem.href}
-            className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all",
-              pathname.startsWith("/advisor")
-                ? "bg-accent-primary text-white shadow-md"
-                : "bg-accent-surface text-accent-primary hover:bg-accent-primary/10"
-            )}
-          >
-            <Sparkles className="w-5 h-5 stroke-[2px]" />
-            <span>AI Advisor</span>
-          </Link>
-          {/* Recommendations - subtle link below */}
-          <Link
-            href="/recommendations"
-            className={cn(
-              "flex items-center gap-2 px-4 py-1.5 mt-1 text-sm transition-all",
-              pathname === "/recommendations"
-                ? "text-accent-primary font-medium"
-                : "text-text-muted hover:text-text-main"
-            )}
-          >
-            <Target className="w-3.5 h-3.5" />
-            <span>Recommendations</span>
-          </Link>
-        </div>
       </nav>
 
       {/* Plan Badge */}
