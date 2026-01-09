@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     });
     const trackedIds = new Set(trackedProgramIds.map(t => t.summerProgramId));
 
-    // Search programs
+    // Search programs - only select fields needed for list display
     const programs = await prisma.summerProgram.findMany({
       where: {
         isActive: true,
@@ -54,6 +54,18 @@ export async function GET(request: NextRequest) {
               { organization: { contains: query, mode: "insensitive" } },
             ]
           : undefined,
+      },
+      select: {
+        id: true,
+        name: true,
+        shortName: true,
+        organization: true,
+        websiteUrl: true,
+        programYear: true,
+        applicationDeadline: true,
+        category: true,
+        location: true,
+        format: true,
       },
       orderBy: [
         { applicationDeadline: "asc" },

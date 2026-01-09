@@ -19,8 +19,41 @@ export async function GET() {
 
     const trackedPrograms = await prisma.studentSummerProgram.findMany({
       where: { studentProfileId: profileId },
-      include: {
-        summerProgram: true,
+      select: {
+        id: true,
+        summerProgramId: true,
+        applicationYear: true,
+        status: true,
+        notes: true,
+        whyInterested: true,
+        isCustom: true,
+        customName: true,
+        customOrganization: true,
+        customDescription: true,
+        displayOrder: true,
+        // Only select needed fields (avoid large text fields like description, eligibilityNotes, applicationNotes, llmContext)
+        summerProgram: {
+          select: {
+            id: true,
+            name: true,
+            shortName: true,
+            organization: true,
+            websiteUrl: true,
+            programYear: true,
+            minGrade: true,
+            maxGrade: true,
+            minAge: true,
+            maxAge: true,
+            minGpaUnweighted: true,
+            citizenship: true,
+            requiredCourses: true,
+            applicationDeadline: true,
+            format: true,
+            location: true,
+            category: true,
+            focusAreas: true,
+          },
+        },
       },
       orderBy: [
         { status: "asc" },

@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
-import { 
-  Plus, 
-  MessageCircle, 
+import {
+  Plus,
+  MessageCircle,
   Sparkles,
   TrendingUp,
   School,
@@ -15,9 +15,15 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
-import { useProfile } from "@/lib/context/ProfileContext";
 import { AddSchoolModal } from "@/components/schools";
 import { SchoolLogo } from "@/components/ui/SchoolLogo";
+
+// Simple client-side cache to persist data across navigation
+const schoolsCache: { data: StudentSchool[] | null; timestamp: number } = {
+  data: null,
+  timestamp: 0,
+};
+const CACHE_TTL = 60000; // 1 minute
 
 // =============================================================================
 // TYPES
@@ -50,26 +56,69 @@ interface StudentSchool {
 // =============================================================================
 
 export default function SchoolsPage() {
-  const { profile, isLoading, isFullyLoaded, refreshProfile } = useProfile();
+  // Initialize from cache if available
+  const [schools, setSchools] = useState<StudentSchool[]>(() => {
+    if (schoolsCache.data && Date.now() - schoolsCache.timestamp < CACHE_TTL) {
+      return schoolsCache.data;
+    }
+    return [];
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    // Not loading if we have cached data
+    return !(schoolsCache.data && Date.now() - schoolsCache.timestamp < CACHE_TTL);
+  });
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const fetchInProgress = useRef(false);
 
-  // Extract schools from profile
-  const schools: StudentSchool[] = (profile?.schoolList || []).map(s => ({
-    id: s.id,
-    tier: s.tier || "reach",
-    isDream: s.isDream || false,
-    status: s.status || null,
-    interestLevel: s.interestLevel || null,
-    isCustom: s.isCustom || false,
-    customName: s.customName || null,
-    customLocation: s.customLocation || null,
-    school: s.school || null,
-  }));
+  // Fetch schools directly - much faster than waiting for full profile
+  const fetchSchools = useCallback(async (force = false) => {
+    // Skip if already fetching (prevents React Strict Mode double-fetch)
+    if (fetchInProgress.current && !force) return;
+
+    // Skip if cache is fresh (unless forced)
+    if (!force && schoolsCache.data && Date.now() - schoolsCache.timestamp < CACHE_TTL) {
+      setSchools(schoolsCache.data);
+      setIsLoading(false);
+      return;
+    }
+
+    fetchInProgress.current = true;
+    try {
+      const res = await fetch("/api/profile/schools");
+      if (res.ok) {
+        const data = await res.json();
+        const mappedData = data.map((s: Record<string, unknown>) => ({
+          id: s.id,
+          tier: s.tier || "reach",
+          isDream: s.isDream || false,
+          status: s.status || null,
+          interestLevel: s.interestLevel || null,
+          isCustom: s.isCustom || false,
+          customName: s.customName || null,
+          customLocation: s.customLocation || null,
+          school: s.school || null,
+        }));
+        setSchools(mappedData);
+        // Update cache
+        schoolsCache.data = mappedData;
+        schoolsCache.timestamp = Date.now();
+      }
+    } catch (error) {
+      console.error("Failed to fetch schools:", error);
+    } finally {
+      setIsLoading(false);
+      fetchInProgress.current = false;
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSchools();
+  }, [fetchSchools]);
 
   const handleDelete = async (id: string) => {
     if (!confirm("Remove this school from your list?")) return;
     await fetch(`/api/profile/schools?id=${id}`, { method: "DELETE" });
-    refreshProfile();
+    fetchSchools(true); // Force refresh after delete
   };
 
   // Group by tier - memoized to avoid re-filtering on every render
@@ -80,9 +129,7 @@ export default function SchoolsPage() {
     dreamSchools: schools.filter(s => s.isDream),
   }), [schools]);
 
-  // Show loading if initial load OR if empty schools and profile not fully loaded yet
-  // (handles the progressive loading case where summary loads first without schoolList)
-  if (isLoading || (schools.length === 0 && !isFullyLoaded)) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="w-8 h-8 border-2 border-accent-primary border-t-transparent rounded-full animate-spin" />
@@ -248,7 +295,7 @@ export default function SchoolsPage() {
         onClose={() => setIsAddModalOpen(false)}
         onSchoolAdded={() => {
           setIsAddModalOpen(false);
-          refreshProfile();
+          fetchSchools(true); // Force refresh after add
         }}
       />
     </>

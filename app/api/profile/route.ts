@@ -64,7 +64,21 @@ export async function GET() {
         },
         schoolList: {
           include: {
-            school: true,
+            school: {
+              select: {
+                id: true,
+                name: true,
+                city: true,
+                state: true,
+                type: true,
+                acceptanceRate: true,
+                satRange25: true,
+                satRange75: true,
+                actRange25: true,
+                actRange75: true,
+                websiteUrl: true,
+              },
+            },
           },
           orderBy: { displayOrder: "asc" },
         },

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Link from "next/link";
 import {
   Sun,
@@ -109,6 +109,13 @@ const STATUS_OPTIONS = [
   { value: "completed", label: "Completed", color: "bg-teal-100 text-teal-700" },
 ];
 
+// Simple client-side cache to persist data across navigation
+const programsCache: { data: TrackedProgram[] | null; timestamp: number } = {
+  data: null,
+  timestamp: 0,
+};
+const CACHE_TTL = 60000; // 1 minute
+
 // =============================================================================
 // MAIN PAGE COMPONENT
 // =============================================================================
@@ -116,23 +123,46 @@ const STATUS_OPTIONS = [
 export default function OpportunitiesPage() {
   const { profile } = useProfile();
   const [activeTab, setActiveTab] = useState<OpportunityTab>("summer");
-  const [trackedPrograms, setTrackedPrograms] = useState<TrackedProgram[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [trackedPrograms, setTrackedPrograms] = useState<TrackedProgram[]>(() => {
+    if (programsCache.data && Date.now() - programsCache.timestamp < CACHE_TTL) {
+      return programsCache.data;
+    }
+    return [];
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    return !(programsCache.data && Date.now() - programsCache.timestamp < CACHE_TTL);
+  });
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEligibilityModal, setShowEligibilityModal] = useState<TrackedProgram | null>(null);
+  const fetchInProgress = useRef(false);
 
   // Fetch tracked programs
-  const fetchTrackedPrograms = useCallback(async () => {
+  const fetchTrackedPrograms = useCallback(async (force = false) => {
+    // Skip if already fetching (prevents React Strict Mode double-fetch)
+    if (fetchInProgress.current && !force) return;
+
+    // Skip if cache is fresh (unless forced)
+    if (!force && programsCache.data && Date.now() - programsCache.timestamp < CACHE_TTL) {
+      setTrackedPrograms(programsCache.data);
+      setIsLoading(false);
+      return;
+    }
+
+    fetchInProgress.current = true;
     try {
       const res = await fetch("/api/opportunities/summer-programs");
       if (res.ok) {
         const data = await res.json();
         setTrackedPrograms(data);
+        // Update cache
+        programsCache.data = data;
+        programsCache.timestamp = Date.now();
       }
     } catch (error) {
       console.error("Error fetching tracked programs:", error);
     } finally {
       setIsLoading(false);
+      fetchInProgress.current = false;
     }
   }, []);
 
@@ -150,7 +180,7 @@ export default function OpportunitiesPage() {
       });
 
       if (res.ok) {
-        await fetchTrackedPrograms();
+        await fetchTrackedPrograms(true); // Force refresh
         setShowAddModal(false);
       }
     } catch (error) {
@@ -172,7 +202,7 @@ export default function OpportunitiesPage() {
     });
 
     if (res.ok) {
-      await fetchTrackedPrograms();
+      await fetchTrackedPrograms(true); // Force refresh
       setShowAddModal(false);
     } else {
       const errorData = await res.json().catch(() => ({}));
@@ -190,9 +220,14 @@ export default function OpportunitiesPage() {
       });
 
       if (res.ok) {
-        setTrackedPrograms(prev =>
-          prev.map(p => (p.id === trackedId ? { ...p, status: newStatus } : p))
+        // Update local state optimistically
+        const updated = trackedPrograms.map(p =>
+          p.id === trackedId ? { ...p, status: newStatus } : p
         );
+        setTrackedPrograms(updated);
+        // Update cache
+        programsCache.data = updated;
+        programsCache.timestamp = Date.now();
       }
     } catch (error) {
       console.error("Error updating status:", error);
@@ -209,7 +244,12 @@ export default function OpportunitiesPage() {
       });
 
       if (res.ok) {
-        setTrackedPrograms(prev => prev.filter(p => p.id !== trackedId));
+        // Update local state optimistically
+        const updated = trackedPrograms.filter(p => p.id !== trackedId);
+        setTrackedPrograms(updated);
+        // Update cache
+        programsCache.data = updated;
+        programsCache.timestamp = Date.now();
       }
     } catch (error) {
       console.error("Error removing program:", error);

@@ -3,6 +3,8 @@
  *
  * Handles session verification and user retrieval.
  * Uses custom email OTP sessions (sesame_session cookie).
+ *
+ * PERFORMANCE: Uses cached profileId cookie to avoid DB lookups on every request.
  */
 
 import { cookies } from "next/headers";
@@ -10,6 +12,7 @@ import { prisma } from "./db";
 
 const SESSION_COOKIE = "sesame_session";
 const USER_ID_COOKIE = "sesame_user_id";
+const PROFILE_ID_COOKIE = "sesame_profile_id";
 
 export interface AuthUser {
   id: string;
@@ -44,11 +47,27 @@ function parseSession(token: string): SessionData | null {
 }
 
 /**
+ * Get session data without DB verification (fast path)
+ * Returns userId from session if valid, null otherwise
+ */
+function getSessionUserId(cookieStore: Awaited<ReturnType<typeof cookies>>): string | null {
+  const sessionToken = cookieStore.get(SESSION_COOKIE)?.value;
+  if (sessionToken) {
+    const session = parseSession(sessionToken);
+    if (session) {
+      return session.userId;
+    }
+  }
+
+  // Fallback to user ID cookie
+  return cookieStore.get(USER_ID_COOKIE)?.value || null;
+}
+
+/**
  * Get the current authenticated user
  *
- * Priority order:
- * 1. Real session (sesame_session cookie) - verify by ID first, fallback to email
- * 2. User ID cookie (sesame_user_id) - fallback for session edge cases
+ * PERFORMANCE NOTE: This does a DB lookup. For most API routes,
+ * use getCurrentProfileId() instead which uses cached profileId.
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
   const cookieStore = await cookies();
@@ -105,24 +124,38 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 /**
  * Get or create the current user's student profile
  *
+ * PERFORMANCE: Uses cached profileId from cookie when available.
+ * Only does DB lookup on first request, then caches in cookie.
+ *
  * Priority:
- * 1. User's own profile (if exists)
- * 2. First shared profile via AccessGrant (if user has access to others)
- * 3. Create a new profile for the user
+ * 1. Cached profileId from cookie (instant, no DB)
+ * 2. User's own profile (if exists)
+ * 3. First shared profile via AccessGrant (if user has access to others)
+ * 4. Create a new profile for the user
  */
 export async function getCurrentProfileId(): Promise<string | null> {
-  const user = await getCurrentUser();
-  if (!user) return null;
+  const cookieStore = await cookies();
 
+  // FAST PATH: Check for cached profileId
+  const userId = getSessionUserId(cookieStore);
+  if (!userId) return null;
+
+  const cachedProfileId = cookieStore.get(PROFILE_ID_COOKIE)?.value;
+  if (cachedProfileId) {
+    // Trust the cached profileId - it was set when we first looked it up
+    return cachedProfileId;
+  }
+
+  // SLOW PATH: First request - need to look up profileId
   // Run profile lookup and access grant check IN PARALLEL
   const [profile, accessGrant] = await Promise.all([
     prisma.studentProfile.findFirst({
-      where: { userId: user.id },
+      where: { userId },
       select: { id: true },
     }),
     prisma.accessGrant.findFirst({
       where: {
-        grantedToUserId: user.id,
+        grantedToUserId: userId,
         revokedAt: null,
       },
       select: {
@@ -134,54 +167,72 @@ export async function getCurrentProfileId(): Promise<string | null> {
     }),
   ]);
 
+  let profileId: string | null = null;
+
   // Return user's own profile if it exists
   if (profile) {
-    return profile.id;
+    profileId = profile.id;
   }
-
   // Otherwise return shared profile if user has access
-  if (accessGrant) {
-    return accessGrant.studentProfileId;
+  else if (accessGrant) {
+    profileId = accessGrant.studentProfileId;
   }
-
   // No profile and no shared access - create one
-  // First ensure user exists in database
-  await prisma.user.upsert({
-    where: { id: user.id },
-    update: {},
-    create: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    },
-  });
+  else {
+    // Get user info for profile creation
+    const user = await getCurrentUser();
+    if (!user) return null;
 
-  // Create profile - use try/catch to handle race condition
-  // where multiple requests try to create profile simultaneously
-  try {
-    const newProfile = await prisma.studentProfile.create({
-      data: {
-        userId: user.id,
-        firstName: user.name?.split(" ")[0] || "Student",
-        lastName: user.name?.split(" ").slice(1).join(" ") || undefined,
+    // First ensure user exists in database
+    await prisma.user.upsert({
+      where: { id: user.id },
+      update: {},
+      create: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
       },
-      select: { id: true },
     });
-    return newProfile.id;
-  } catch (error) {
-    // If unique constraint error (P2002), another request created the profile first
-    // Just fetch and return it
-    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-      const existingProfile = await prisma.studentProfile.findFirst({
-        where: { userId: user.id },
+
+    // Create profile - use try/catch to handle race condition
+    try {
+      const newProfile = await prisma.studentProfile.create({
+        data: {
+          userId: user.id,
+          firstName: user.name?.split(" ")[0] || "Student",
+          lastName: user.name?.split(" ").slice(1).join(" ") || undefined,
+        },
         select: { id: true },
       });
-      if (existingProfile) {
-        return existingProfile.id;
+      profileId = newProfile.id;
+    } catch (error) {
+      // If unique constraint error (P2002), another request created the profile first
+      if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
+        const existingProfile = await prisma.studentProfile.findFirst({
+          where: { userId: user.id },
+          select: { id: true },
+        });
+        if (existingProfile) {
+          profileId = existingProfile.id;
+        }
+      } else {
+        throw error;
       }
     }
-    throw error;
   }
+
+  // Cache the profileId for future requests
+  if (profileId) {
+    cookieStore.set(PROFILE_ID_COOKIE, profileId, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 30 * 24 * 60 * 60, // 30 days (same as session)
+      path: "/",
+    });
+  }
+
+  return profileId;
 }
 
 /**
@@ -275,4 +326,13 @@ export async function clearAuthCookies(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
   cookieStore.delete(USER_ID_COOKIE);
+  cookieStore.delete(PROFILE_ID_COOKIE);
+}
+
+/**
+ * Invalidate cached profileId (call when profile changes, e.g., access grants)
+ */
+export async function invalidateProfileCache(): Promise<void> {
+  const cookieStore = await cookies();
+  cookieStore.delete(PROFILE_ID_COOKIE);
 }

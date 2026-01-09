@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { 
-  User, 
+import {
+  User,
   ChevronLeft,
   Plus,
   Trash2,
@@ -49,39 +49,68 @@ const themeColors: Record<string, { bg: string; text: string }> = {
   Resilience: { bg: "bg-red-100", text: "text-red-700" },
 };
 
+// Simple client-side cache
+const storiesCache: { data: AboutMeData | null; timestamp: number } = {
+  data: null,
+  timestamp: 0,
+};
+const CACHE_TTL = 60000; // 1 minute
+
 export default function AboutMePage() {
-  const [aboutMe, setAboutMe] = useState<AboutMeData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [aboutMe, setAboutMe] = useState<AboutMeData | null>(() => {
+    if (storiesCache.data && Date.now() - storiesCache.timestamp < CACHE_TTL) {
+      return storiesCache.data;
+    }
+    return null;
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    return !(storiesCache.data && Date.now() - storiesCache.timestamp < CACHE_TTL);
+  });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [expandedStory, setExpandedStory] = useState<string | null>(null);
+  const fetchInProgress = useRef(false);
 
-  const fetchAboutMe = async () => {
+  const fetchAboutMe = useCallback(async (force = false) => {
+    // Skip if already fetching
+    if (fetchInProgress.current && !force) return;
+
+    // Skip if cache is fresh
+    if (!force && storiesCache.data && Date.now() - storiesCache.timestamp < CACHE_TTL) {
+      setAboutMe(storiesCache.data);
+      setIsLoading(false);
+      return;
+    }
+
+    fetchInProgress.current = true;
     try {
       const res = await fetch("/api/profile/stories");
       if (res.ok) {
         const data = await res.json();
         setAboutMe(data);
+        storiesCache.data = data;
+        storiesCache.timestamp = Date.now();
       }
     } catch (error) {
       console.error("Error fetching about me:", error);
     } finally {
       setIsLoading(false);
+      fetchInProgress.current = false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAboutMe();
-  }, []);
+  }, [fetchAboutMe]);
 
   const handleDeleteStory = async (id: string) => {
     if (!confirm("Are you sure you want to delete this story?")) return;
-    
+
     await fetch(`/api/profile/stories/${id}`, { method: "DELETE" });
-    fetchAboutMe();
+    fetchAboutMe(true); // Force refresh after delete
   };
 
   const handleStorySaved = () => {
-    fetchAboutMe();
+    fetchAboutMe(true); // Force refresh after save
   };
 
   const formatDate = (dateString: string) => {

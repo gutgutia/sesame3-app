@@ -9,13 +9,36 @@ import { requireProfile } from "@/lib/auth";
 export async function GET() {
   try {
     const profileId = await requireProfile();
-    
+
     const schools = await prisma.studentSchool.findMany({
       where: { studentProfileId: profileId },
-      include: { school: true },
+      select: {
+        id: true,
+        tier: true,
+        isDream: true,
+        status: true,
+        interestLevel: true,
+        isCustom: true,
+        customName: true,
+        customLocation: true,
+        displayOrder: true,
+        // Only select needed school fields (avoid large 'notes' field)
+        school: {
+          select: {
+            id: true,
+            name: true,
+            city: true,
+            state: true,
+            acceptanceRate: true,
+            satRange25: true,
+            satRange75: true,
+            websiteUrl: true,
+          },
+        },
+      },
       orderBy: { displayOrder: "asc" },
     });
-    
+
     return NextResponse.json(schools);
   } catch (error) {
     if (error instanceof Error && error.message === "Profile not found") {

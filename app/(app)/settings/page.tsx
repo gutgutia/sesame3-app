@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Settings,
   User,
@@ -371,6 +371,15 @@ function PlanSelectorModal({
   );
 }
 
+// Simple client-side cache for settings
+const settingsCache: {
+  settings: UserSettings | null;
+  usage: UsageData | null;
+  invoices: Invoice[];
+  timestamp: number;
+} = { settings: null, usage: null, invoices: [], timestamp: 0 };
+const CACHE_TTL = 60000; // 1 minute
+
 // =============================================================================
 // MAIN PAGE
 // =============================================================================
@@ -379,14 +388,26 @@ export default function SettingsPage() {
   const { profile } = useProfile();
   const [activeTab, setActiveTab] = useState<"profile" | "subscription" | "advisor">("profile");
   const [isYearly, setIsYearly] = useState(true);
-  const [settings, setSettings] = useState<UserSettings | null>(null);
-  const [usage, setUsage] = useState<UsageData | null>(null);
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [settings, setSettings] = useState<UserSettings | null>(() => {
+    if (Date.now() - settingsCache.timestamp < CACHE_TTL) return settingsCache.settings;
+    return null;
+  });
+  const [usage, setUsage] = useState<UsageData | null>(() => {
+    if (Date.now() - settingsCache.timestamp < CACHE_TTL) return settingsCache.usage;
+    return null;
+  });
+  const [invoices, setInvoices] = useState<Invoice[]>(() => {
+    if (Date.now() - settingsCache.timestamp < CACHE_TTL) return settingsCache.invoices;
+    return [];
+  });
+  const [isLoading, setIsLoading] = useState(() => {
+    return !(Date.now() - settingsCache.timestamp < CACHE_TTL && settingsCache.settings);
+  });
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showUsage, setShowUsage] = useState(false);
   const [showPlanSelector, setShowPlanSelector] = useState(false);
+  const fetchInProgress = useRef(false);
 
   // Advisor preferences state
   const [accountabilityLevel, setAccountabilityLevel] = useState<"light" | "moderate" | "high">("moderate");
@@ -405,7 +426,7 @@ export default function SettingsPage() {
   const [editBirthDate, setEditBirthDate] = useState("");
   const [editResidencyStatus, setEditResidencyStatus] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
-  
+
   // Confirmation modal state
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
@@ -418,32 +439,51 @@ export default function SettingsPage() {
   } | null>(null);
 
   // Load user settings, usage, and invoices
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (force = false) => {
+    // Skip if already fetching
+    if (fetchInProgress.current && !force) return;
+
+    // Skip if cache is fresh
+    if (!force && Date.now() - settingsCache.timestamp < CACHE_TTL && settingsCache.settings) {
+      setSettings(settingsCache.settings);
+      setUsage(settingsCache.usage);
+      setInvoices(settingsCache.invoices);
+      setIsLoading(false);
+      return;
+    }
+
+    fetchInProgress.current = true;
     try {
       const [settingsRes, usageRes, invoicesRes] = await Promise.all([
         fetch("/api/settings"),
         fetch("/api/usage"),
         fetch("/api/invoices"),
       ]);
-      
+
       if (settingsRes.ok) {
         const data = await settingsRes.json();
         setSettings(data);
+        settingsCache.settings = data;
       }
-      
+
       if (usageRes.ok) {
         const data = await usageRes.json();
         setUsage(data);
+        settingsCache.usage = data;
       }
-      
+
       if (invoicesRes.ok) {
         const data = await invoicesRes.json();
         setInvoices(data.invoices || []);
+        settingsCache.invoices = data.invoices || [];
       }
+
+      settingsCache.timestamp = Date.now();
     } catch (error) {
       console.error("Failed to load settings:", error);
     } finally {
       setIsLoading(false);
+      fetchInProgress.current = false;
     }
   }, []);
 
