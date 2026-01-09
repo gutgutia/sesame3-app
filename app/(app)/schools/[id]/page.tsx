@@ -149,10 +149,15 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
 
   // Update local state when chances are calculated
   const handleChanceCalculated = (result: ChancesResult) => {
+    // calculatedAt might be a Date or string depending on source
+    const chanceDate = result.calculatedAt instanceof Date
+      ? result.calculatedAt.toISOString()
+      : String(result.calculatedAt);
+
     setData(prev => prev ? {
       ...prev,
       calculatedChance: result.probability / 100,
-      chanceUpdatedAt: result.calculatedAt.toISOString(),
+      chanceUpdatedAt: chanceDate,
       profileChangedSinceChanceCheck: false,
     } : null);
   };
