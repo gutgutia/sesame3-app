@@ -13,6 +13,8 @@ import {
   MessageSquare,
   BarChart3,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -48,6 +50,8 @@ export function ChancesSection({
   const [calculationProgress, setCalculationProgress] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<ChancesResult | null>(null);
+  // Default to collapsed if we already have a chance, expanded if not
+  const [isExpanded, setIsExpanded] = useState(calculatedChance === null);
 
   const hasExistingChance = calculatedChance !== null;
   const showOutdatedBanner = hasExistingChance && profileChangedSinceChanceCheck;
@@ -154,6 +158,41 @@ export function ChancesSection({
   // =============================================================================
   // STATE 2 & 3: Has result (fresh or stored)
   // =============================================================================
+
+  // Collapsed view - compact summary
+  if (!isExpanded && !isCalculating) {
+    return (
+      <Card className="p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-accent-primary" />
+              <h2 className="font-display font-bold text-text-main">Your Chances</h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-2xl font-bold text-text-main">
+                {displayResult?.probability}%
+              </span>
+              <TierBadge tier={displayResult?.tier || "target"} />
+            </div>
+            {showOutdatedBanner && !result && (
+              <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                Outdated
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setIsExpanded(true)}
+            className="p-1.5 text-text-muted hover:text-text-main hover:bg-bg-sidebar rounded-lg transition-colors"
+          >
+            <ChevronDown className="w-5 h-5" />
+          </button>
+        </div>
+      </Card>
+    );
+  }
+
+  // Expanded view - full details
   return (
     <Card className="p-6">
       {/* Header */}
@@ -162,11 +201,21 @@ export function ChancesSection({
           <TrendingUp className="w-5 h-5 text-accent-primary" />
           <h2 className="font-display font-bold text-lg text-text-main">Your Chances</h2>
         </div>
-        {displayResult?.calculatedAt && (
-          <span className="text-xs text-text-muted">
-            Last checked {formatDate(displayResult.calculatedAt)}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {displayResult?.calculatedAt && (
+            <span className="text-xs text-text-muted">
+              Last checked {formatDate(displayResult.calculatedAt)}
+            </span>
+          )}
+          {!isCalculating && (
+            <button
+              onClick={() => setIsExpanded(false)}
+              className="p-1.5 text-text-muted hover:text-text-main hover:bg-bg-sidebar rounded-lg transition-colors"
+            >
+              <ChevronUp className="w-5 h-5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Outdated banner */}
@@ -196,9 +245,9 @@ export function ChancesSection({
 
       {/* Calculating state */}
       {isCalculating ? (
-        <div className="text-center py-8">
-          <Loader2 className="w-8 h-8 animate-spin text-accent-primary mx-auto mb-3" />
-          <p className="text-text-muted">{calculationProgress}</p>
+        <div className="text-center py-6">
+          <Loader2 className="w-6 h-6 animate-spin text-accent-primary mx-auto mb-2" />
+          <p className="text-sm text-text-muted">{calculationProgress}</p>
         </div>
       ) : (
         <>
