@@ -13,25 +13,57 @@ export async function GET(
   try {
     const profileId = await requireProfile();
     const { id } = await params;
-    
-    const studentSchool = await prisma.studentSchool.findFirst({
-      where: { 
-        id,
-        studentProfileId: profileId,
-      },
-      include: { 
-        school: true,
-        richNotes: {
-          orderBy: { createdAt: "desc" },
+
+    // Fetch student school and profile data in parallel
+    const [studentSchool, profile] = await Promise.all([
+      prisma.studentSchool.findFirst({
+        where: {
+          id,
+          studentProfileId: profileId,
         },
-      },
-    });
-    
+        include: {
+          school: true,
+          richNotes: {
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      }),
+      prisma.studentProfile.findUnique({
+        where: { id: profileId },
+        select: {
+          updatedAt: true,
+          // Get timestamps for chances-relevant data
+          testing: { select: { updatedAt: true } },
+          academics: { select: { updatedAt: true } },
+        },
+      }),
+    ]);
+
     if (!studentSchool) {
       return NextResponse.json({ error: "School not found" }, { status: 404 });
     }
-    
-    return NextResponse.json(studentSchool);
+
+    // Determine if profile has changed since last chance calculation
+    let profileChangedSinceChanceCheck = false;
+    if (studentSchool.chanceUpdatedAt && profile) {
+      const chanceDate = new Date(studentSchool.chanceUpdatedAt);
+
+      // Check if any relevant profile data has been updated since
+      const relevantDates = [
+        profile.updatedAt,
+        profile.testing?.updatedAt,
+        profile.academics?.updatedAt,
+      ].filter(Boolean) as Date[];
+
+      profileChangedSinceChanceCheck = relevantDates.some(
+        date => date > chanceDate
+      );
+    }
+
+    return NextResponse.json({
+      ...studentSchool,
+      profileChangedSinceChanceCheck,
+    });
   } catch (error) {
     if (error instanceof Error && error.message === "Profile not found") {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });

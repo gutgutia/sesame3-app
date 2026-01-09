@@ -9,8 +9,6 @@ import {
   ExternalLink,
   Plus,
   FileText,
-  TrendingUp,
-  RefreshCw,
   Calendar,
   DollarSign,
   Users,
@@ -22,7 +20,9 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { SchoolLogo } from "@/components/ui/SchoolLogo";
+import { ChancesSection } from "@/components/schools/ChancesSection";
 import { cn } from "@/lib/utils";
+import { ChancesResult } from "@/lib/chances/types";
 
 // Lazy-load Novel editor modal - only loads when user opens note editor
 const NoteEditorModal = dynamic(
@@ -84,6 +84,7 @@ interface StudentSchoolData {
   applicationType: string | null;
   calculatedChance: number | null;
   chanceUpdatedAt: string | null;
+  profileChangedSinceChanceCheck: boolean;
   school: School;
   richNotes: SchoolNote[];
 }
@@ -144,6 +145,16 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
       initialContent: note.content,
       initialTitle: note.title || undefined,
     });
+  };
+
+  // Update local state when chances are calculated
+  const handleChanceCalculated = (result: ChancesResult) => {
+    setData(prev => prev ? {
+      ...prev,
+      calculatedChance: result.probability / 100,
+      chanceUpdatedAt: result.calculatedAt.toISOString(),
+      profileChangedSinceChanceCheck: false,
+    } : null);
   };
 
   if (isLoading) {
@@ -221,8 +232,18 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Notes (2/3) */}
+        {/* Left Column - Main Content (2/3) */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Chances Section */}
+          <ChancesSection
+            schoolId={school.id}
+            schoolName={school.shortName || school.name}
+            calculatedChance={data.calculatedChance}
+            chanceUpdatedAt={data.chanceUpdatedAt}
+            profileChangedSinceChanceCheck={data.profileChangedSinceChanceCheck}
+            onChanceCalculated={handleChanceCalculated}
+          />
+
           {/* Notes Section */}
           <Card className="p-6">
             <div className="flex items-center justify-between mb-5">
@@ -233,8 +254,8 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
                   {richNotes.length}
                 </span>
               </div>
-              <Button 
-                size="sm" 
+              <Button
+                size="sm"
                 onClick={() => setNoteModalState({ isOpen: true, mode: "create" })}
               >
                 <Plus className="w-4 h-4" />
@@ -246,14 +267,14 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
               <div className="text-center py-12 text-text-muted">
                 <FileText className="w-10 h-10 mx-auto mb-3 opacity-50" />
                 <p>No notes yet</p>
-                <p className="text-sm mt-1">Click "Add Note" to start capturing your thoughts about {school.shortName || school.name}.</p>
+                <p className="text-sm mt-1">Click &quot;Add Note&quot; to start capturing your thoughts about {school.shortName || school.name}.</p>
               </div>
             ) : (
               <div className="space-y-4">
                 {richNotes.map(note => (
-                  <NoteCard 
-                    key={note.id} 
-                    note={note} 
+                  <NoteCard
+                    key={note.id}
+                    note={note}
                     onEdit={() => openEditNote(note)}
                     onDelete={() => handleDeleteNote(note.id)}
                   />
@@ -265,13 +286,6 @@ export default function SchoolDetailPage({ params }: { params: Promise<{ id: str
 
         {/* Right Column - Sidebar (1/3) */}
         <div className="space-y-5">
-          {/* Chances Widget */}
-          <ChancesWidget 
-            chance={data.calculatedChance}
-            updatedAt={data.chanceUpdatedAt}
-            schoolId={school.id}
-          />
-
           {/* Quick Facts */}
           <QuickFacts school={school} />
 
@@ -393,59 +407,6 @@ function NoteCard({
         Click to view full note
       </div>
     </div>
-  );
-}
-
-function ChancesWidget({ 
-  chance, 
-  updatedAt,
-  schoolId,
-}: { 
-  chance: number | null;
-  updatedAt: string | null;
-  schoolId: string;
-}) {
-  const hasChance = chance !== null;
-  
-  return (
-    <Card className="p-5">
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-5 h-5 text-accent-primary" />
-        <h3 className="font-display font-bold text-text-main">Your Chances</h3>
-      </div>
-      
-      {hasChance ? (
-        <>
-          <div className="text-4xl font-bold text-text-main mb-2">
-            {Math.round(chance * 100)}%
-          </div>
-          <p className="text-sm text-text-muted mb-4">
-            Last updated: {new Date(updatedAt!).toLocaleDateString("en-US", { 
-              month: "short", 
-              day: "numeric" 
-            })}
-          </p>
-          <Link href={`/chances?school=${schoolId}`}>
-            <Button variant="secondary" className="w-full">
-              <RefreshCw className="w-4 h-4" />
-              Update Chances
-            </Button>
-          </Link>
-        </>
-      ) : (
-        <>
-          <p className="text-text-muted text-sm mb-4">
-            Calculate your admission chances based on your profile.
-          </p>
-          <Link href={`/chances?school=${schoolId}`}>
-            <Button className="w-full">
-              <TrendingUp className="w-4 h-4" />
-              Check My Chances
-            </Button>
-          </Link>
-        </>
-      )}
-    </Card>
   );
 }
 

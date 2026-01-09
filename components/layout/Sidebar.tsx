@@ -51,15 +51,7 @@ const navItems: NavItem[] = [
       { name: "Programs", href: "/profile/programs", icon: GraduationCap },
     ]
   },
-  {
-    name: "Schools",
-    href: "/schools",
-    icon: BookOpen,
-    children: [
-      { name: "My Schools", href: "/schools", icon: BookOpen },
-      { name: "Chances", href: "/chances", icon: Target },
-    ]
-  },
+  { name: "Schools", href: "/schools", icon: BookOpen },
   { name: "Opportunities", href: "/opportunities", icon: GraduationCap },
   { name: "Plan", href: "/plan", icon: Compass },
 ];
