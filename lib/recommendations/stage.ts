@@ -13,19 +13,23 @@
 
 export type StudentStage =
   | "freshman_fall"
+  | "freshman_winter"
   | "freshman_spring"
   | "freshman_summer"
   | "sophomore_fall"
+  | "sophomore_winter"
   | "sophomore_spring"
   | "sophomore_summer"
   | "junior_fall"
+  | "junior_winter"
   | "junior_spring"
   | "junior_summer"
   | "senior_fall"
+  | "senior_winter"
   | "senior_spring"
   | "post_graduation";
 
-export type Season = "fall" | "spring" | "summer";
+export type Season = "fall" | "winter" | "spring" | "summer";
 
 export interface StageInfo {
   stage: StudentStage;
@@ -40,15 +44,19 @@ export interface StageInfo {
 /**
  * Determines the current season based on the date
  * - Fall: August 15 - December 31
- * - Spring: January 1 - May 31
+ * - Winter: January 1 - February 28/29
+ * - Spring: March 1 - May 31
  * - Summer: June 1 - August 14
  */
 export function getSeason(date: Date = new Date()): Season {
   const month = date.getMonth(); // 0-11
   const day = date.getDate();
 
-  if (month >= 0 && month <= 4) {
-    // January - May
+  if (month >= 0 && month <= 1) {
+    // January - February
+    return "winter";
+  } else if (month >= 2 && month <= 4) {
+    // March - May
     return "spring";
   } else if (month >= 5 && month <= 7) {
     // June - August
@@ -112,14 +120,22 @@ export function calculateGrade(
 
 /**
  * Gets the full stage information for a student
+ *
+ * @param graduationYear - Student's graduation year
+ * @param options.date - Date to calculate season from (defaults to now)
+ * @param options.grade - Override grade instead of calculating from graduationYear
  */
 export function getStudentStage(
   graduationYear: number | null,
-  date: Date = new Date()
+  options: { date?: Date; grade?: string | null } = {}
 ): StageInfo {
+  const date = options.date ?? new Date();
+
   // Default to junior if no graduation year provided
   const effectiveGradYear = graduationYear ?? getCurrentAcademicYear(date) + 1;
-  const grade = calculateGrade(effectiveGradYear, date);
+
+  // Use provided grade if available, otherwise calculate from graduation year
+  const grade = options.grade || calculateGrade(effectiveGradYear, date);
   const season = getSeason(date);
 
   // Determine stage and recommendations based on grade and season
@@ -178,6 +194,17 @@ function getStageDetails(stage: StudentStage): {
         recommendationTypes: ["activity", "general"],
       };
 
+    case "freshman_winter":
+      return {
+        description: "First semester wrapping up",
+        priorities: [
+          "Finish strong in first semester",
+          "Reflect on activities and interests",
+          "Consider next semester courses",
+        ],
+        recommendationTypes: ["activity", "general"],
+      };
+
     case "freshman_spring":
       return {
         description: "Finding your footing",
@@ -207,6 +234,17 @@ function getStageDetails(stage: StudentStage): {
           "Take challenging courses",
           "Develop leadership in activities",
           "Start PSAT prep",
+        ],
+        recommendationTypes: ["program", "activity", "general"],
+      };
+
+    case "sophomore_winter":
+      return {
+        description: "Mid-year momentum",
+        priorities: [
+          "Maintain strong grades",
+          "PSAT preparation",
+          "Research summer opportunities",
         ],
         recommendationTypes: ["program", "activity", "general"],
       };
@@ -245,6 +283,18 @@ function getStageDetails(stage: StudentStage): {
         recommendationTypes: ["school", "program", "activity", "general"],
       };
 
+    case "junior_winter":
+      return {
+        description: "Junior year in full swing",
+        priorities: [
+          "Strong midterm grades",
+          "Continue test prep",
+          "Start college research",
+          "Plan college visits",
+        ],
+        recommendationTypes: ["school", "program", "activity", "general"],
+      };
+
     case "junior_spring":
       return {
         description: "Test season and college research",
@@ -279,6 +329,18 @@ function getStageDetails(stage: StudentStage): {
           "Request recommendations",
         ],
         recommendationTypes: ["school", "general"],
+      };
+
+    case "senior_winter":
+      return {
+        description: "Application wrap-up",
+        priorities: [
+          "Complete remaining applications",
+          "Submit financial aid forms",
+          "Keep grades up",
+          "Wait for decisions",
+        ],
+        recommendationTypes: ["general"],
       };
 
     case "senior_spring":

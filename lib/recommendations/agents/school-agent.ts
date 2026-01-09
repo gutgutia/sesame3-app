@@ -23,22 +23,19 @@ const SchoolRecommendationSchema = z.object({
       schoolId: z.string().describe("The ID of the school from the provided list"),
       tier: z
         .enum(["reach", "target", "safety"])
-        .describe("Classification based on student's profile"),
+        .describe("Classification based on your holistic assessment of the student's profile"),
       reasoning: z
         .string()
-        .describe("2-3 sentences explaining why this school is a good fit"),
-      fitScore: z
-        .number()
-        .min(0)
-        .max(1)
-        .describe("How well this school matches the student (0-1)"),
+        .describe("3-5 sentences explaining why this school is a good fit, considering academics, interests, activities, and overall profile alignment"),
+      matchLevel: z
+        .enum(["high", "medium", "low"])
+        .describe("How well this school matches the student holistically - considering academics, interests, extracurriculars, and overall fit"),
       priority: z
         .enum(["high", "medium", "low"])
-        .describe("How important this recommendation is"),
+        .describe("How important this recommendation is for the student to consider"),
       actionItems: z
         .array(z.string())
-        .optional()
-        .describe("Specific next steps for this school"),
+        .describe("2-4 specific next steps for this school"),
     })
   ),
   summary: z
@@ -70,7 +67,7 @@ export async function generateSchoolRecommendations(
 
   try {
     const { object } = await generateObject({
-      model: modelFor.advisor,
+      model: modelFor.fastParsing, // Use Kimi K2 for speed
       schema: SchoolRecommendationSchema,
       prompt,
     });
@@ -87,8 +84,8 @@ export async function generateSchoolRecommendations(
         title: schoolMap.get(rec.schoolId)!,
         subtitle: `${rec.tier.charAt(0).toUpperCase() + rec.tier.slice(1)} School`,
         reasoning: rec.reasoning,
-        fitScore: rec.fitScore,
-        priority: rec.priority,
+        // Use matchLevel directly as priority for display
+        priority: rec.matchLevel,
         actionItems: rec.actionItems,
         relevantGrade: stage.grade,
         schoolId: rec.schoolId,
@@ -236,15 +233,28 @@ function buildSchoolPrompt(
   parts.push("");
   parts.push("## Instructions");
   parts.push("");
-  parts.push("Based on this profile, recommend 5-8 colleges from the list above. Include a mix of:");
+  parts.push("Based on this student's complete profile, recommend 5-8 colleges from the list above. Include a mix of:");
   parts.push("- 2-3 Reach schools (acceptance rate significantly below what their stats suggest)");
   parts.push("- 2-3 Target schools (realistic chances based on their profile)");
   parts.push("- 1-2 Safety schools (very likely to be admitted)");
   parts.push("");
   parts.push("IMPORTANT: You must use the exact school IDs from the list above. Do not make up IDs.");
   parts.push("");
-  parts.push("For each school, explain why it's a good fit considering their academics, interests, and preferences.");
-  parts.push("Use your knowledge of these colleges to assess fit - you don't need to list specific statistics.");
+  parts.push("## Holistic Assessment");
+  parts.push("");
+  parts.push("For each school recommendation, provide a HOLISTIC assessment considering:");
+  parts.push("- **Academics**: GPA, test scores, course rigor relative to school requirements");
+  parts.push("- **Interests & Fit**: How the student's interests, values, and aspirations align with the school's programs and culture");
+  parts.push("- **Activities & Awards**: Strength and uniqueness of extracurricular involvement");
+  parts.push("- **Overall Profile**: The complete picture of who this student is and how they'd thrive at this school");
+  parts.push("");
+  parts.push("For matchLevel, assess holistically:");
+  parts.push("- **High**: Strong alignment across academics, interests, and activities. Clear fit.");
+  parts.push("- **Medium**: Good potential fit with some alignment, but limited data in some areas.");
+  parts.push("- **Low**: Speculative recommendation - could be good but uncertain based on profile.");
+  parts.push("");
+  parts.push("Write detailed reasoning (3-5 sentences) explaining WHY this school is a good fit, not just listing facts.");
+  parts.push("Include 2-4 specific, actionable next steps for each school.");
 
   return parts.join("\n");
 }

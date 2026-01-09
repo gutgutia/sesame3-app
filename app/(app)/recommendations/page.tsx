@@ -339,6 +339,8 @@ export default function RecommendationsPage() {
 // COMPONENTS
 // =============================================================================
 
+const INITIAL_VISIBLE_COUNT = 3;
+
 function RecommendationSection({
   title,
   icon: Icon,
@@ -354,6 +356,10 @@ function RecommendationSection({
   onSave: (id: string) => void;
   onAddToList: (rec: Recommendation) => void;
 }) {
+  const [showAll, setShowAll] = useState(false);
+  const visibleRecs = showAll ? recommendations : recommendations.slice(0, INITIAL_VISIBLE_COUNT);
+  const hiddenCount = recommendations.length - INITIAL_VISIBLE_COUNT;
+
   return (
     <div>
       <div className="flex items-center gap-2 mb-4">
@@ -366,7 +372,7 @@ function RecommendationSection({
         </span>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {recommendations.map((rec) => (
+        {visibleRecs.map((rec) => (
           <RecommendationCard
             key={rec.id}
             recommendation={rec}
@@ -376,6 +382,22 @@ function RecommendationSection({
           />
         ))}
       </div>
+      {!showAll && hiddenCount > 0 && (
+        <button
+          onClick={() => setShowAll(true)}
+          className="mt-4 w-full py-3 text-sm font-medium text-accent-primary hover:text-accent-primary/80 border border-dashed border-accent-border rounded-xl hover:bg-accent-surface/50 transition-colors"
+        >
+          Show {hiddenCount} more {hiddenCount === 1 ? "recommendation" : "recommendations"}
+        </button>
+      )}
+      {showAll && hiddenCount > 0 && (
+        <button
+          onClick={() => setShowAll(false)}
+          className="mt-4 w-full py-3 text-sm font-medium text-text-muted hover:text-text-main border border-dashed border-border-subtle rounded-xl hover:bg-bg-sidebar/50 transition-colors"
+        >
+          Show less
+        </button>
+      )}
     </div>
   );
 }
@@ -391,10 +413,14 @@ function RecommendationCard({
   onSave: () => void;
   onAddToList: () => void;
 }) {
-  const priorityColors = {
-    high: "bg-red-100 text-red-700 border-red-200",
-    medium: "bg-yellow-100 text-yellow-700 border-yellow-200",
-    low: "bg-green-100 text-green-700 border-green-200",
+  const [showAllSteps, setShowAllSteps] = useState(false);
+  const [expandedReasoning, setExpandedReasoning] = useState(false);
+
+  // Match level colors (High match = green/good, Low match = yellow/uncertain)
+  const matchLevelColors = {
+    high: "bg-green-100 text-green-700 border-green-200",
+    medium: "bg-blue-100 text-blue-700 border-blue-200",
+    low: "bg-yellow-100 text-yellow-700 border-yellow-200",
   };
 
   const categoryIcons = {
@@ -406,6 +432,8 @@ function RecommendationCard({
 
   const CategoryIcon = categoryIcons[recommendation.category];
   const isSaved = recommendation.status === "saved";
+  const hasMoreSteps = recommendation.actionItems.length > 2;
+  const visibleSteps = showAllSteps ? recommendation.actionItems : recommendation.actionItems.slice(0, 2);
 
   return (
     <div
@@ -424,10 +452,10 @@ function RecommendationCard({
             <span
               className={cn(
                 "px-2 py-0.5 text-xs font-medium rounded-full border",
-                priorityColors[recommendation.priority]
+                matchLevelColors[recommendation.priority]
               )}
             >
-              {recommendation.priority}
+              {recommendation.priority.charAt(0).toUpperCase() + recommendation.priority.slice(1)} Match
             </span>
           )}
         </div>
@@ -465,27 +493,25 @@ function RecommendationCard({
       )}
 
       {/* Reasoning */}
-      <p className="text-sm text-text-main mb-4 line-clamp-3">
-        {recommendation.reasoning}
-      </p>
+      <div className="mb-4">
+        <p
+          className={cn(
+            "text-sm text-text-main",
+            !expandedReasoning && "line-clamp-3"
+          )}
+        >
+          {recommendation.reasoning}
+        </p>
+        {recommendation.reasoning.length > 150 && (
+          <button
+            onClick={() => setExpandedReasoning(!expandedReasoning)}
+            className="text-xs text-accent-primary hover:underline mt-1"
+          >
+            {expandedReasoning ? "Show less" : "Read more"}
+          </button>
+        )}
+      </div>
 
-      {/* Fit Score */}
-      {recommendation.fitScore !== null && (
-        <div className="mb-3">
-          <div className="flex items-center justify-between text-xs mb-1">
-            <span className="text-text-muted">Fit Score</span>
-            <span className="font-medium text-text-main">
-              {Math.round(recommendation.fitScore * 100)}%
-            </span>
-          </div>
-          <div className="h-1.5 bg-bg-sidebar rounded-full overflow-hidden">
-            <div
-              className="h-full bg-accent-primary rounded-full"
-              style={{ width: `${recommendation.fitScore * 100}%` }}
-            />
-          </div>
-        </div>
-      )}
 
       {/* Action Items */}
       {recommendation.actionItems.length > 0 && (
@@ -494,18 +520,25 @@ function RecommendationCard({
             Next Steps
           </h4>
           <ul className="space-y-1">
-            {recommendation.actionItems.slice(0, 2).map((item, i) => (
+            {visibleSteps.map((item, i) => (
               <li key={i} className="flex items-start gap-2 text-sm">
                 <ChevronRight className="w-3 h-3 mt-1 text-text-muted shrink-0" />
                 <span className="text-text-main">{item}</span>
               </li>
             ))}
-            {recommendation.actionItems.length > 2 && (
-              <li className="text-xs text-text-muted">
-                +{recommendation.actionItems.length - 2} more
-              </li>
-            )}
           </ul>
+          {hasMoreSteps && (
+            <button
+              onClick={() => setShowAllSteps(!showAllSteps)}
+              className="text-xs text-accent-primary hover:underline mt-2 flex items-center gap-1"
+            >
+              {showAllSteps ? (
+                <>Show less</>
+              ) : (
+                <>+{recommendation.actionItems.length - 2} more</>
+              )}
+            </button>
+          )}
         </div>
       )}
 

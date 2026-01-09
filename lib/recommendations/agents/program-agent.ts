@@ -21,19 +21,16 @@ const ProgramRecommendationSchema = z.object({
       programId: z.string().describe("The ID of the program from the list"),
       reasoning: z
         .string()
-        .describe("2-3 sentences explaining why this program is a good fit"),
-      fitScore: z
-        .number()
-        .min(0)
-        .max(1)
-        .describe("How well this program matches the student (0-1)"),
+        .describe("3-5 sentences explaining why this program is a good fit, considering the student's interests, activities, and how it would strengthen their college application"),
+      matchLevel: z
+        .enum(["high", "medium", "low"])
+        .describe("How well this program matches the student holistically - considering interests, activities, academic profile, and potential impact on college applications"),
       priority: z
         .enum(["high", "medium", "low"])
-        .describe("How important this recommendation is"),
+        .describe("How important this recommendation is for the student to consider"),
       actionItems: z
         .array(z.string())
-        .optional()
-        .describe("Specific next steps for this program"),
+        .describe("2-4 specific next steps for this program"),
     })
   ),
   summary: z
@@ -47,8 +44,8 @@ export async function generateProgramRecommendations(
 ): Promise<GeneratedRecommendation[]> {
   const { profile, stage, preferences } = input;
 
-  // Don't recommend programs to seniors in spring (too late)
-  if (stage.stage === "senior_spring") {
+  // Don't recommend programs to seniors in winter/spring (too late)
+  if (stage.stage === "senior_spring" || stage.stage === "senior_winter") {
     return [];
   }
 
@@ -69,7 +66,7 @@ export async function generateProgramRecommendations(
 
   try {
     const { object } = await generateObject({
-      model: modelFor.advisor,
+      model: modelFor.fastParsing, // Use Kimi K2 for speed
       schema: ProgramRecommendationSchema,
       prompt,
     });
@@ -88,8 +85,8 @@ export async function generateProgramRecommendations(
           title: program.name,
           subtitle: program.organization,
           reasoning: rec.reasoning,
-          fitScore: rec.fitScore,
-          priority: rec.priority,
+          // Use matchLevel directly as priority for display
+          priority: rec.matchLevel,
           actionItems: rec.actionItems,
           relevantGrade: stage.grade,
           summerProgramId: program.id,
@@ -112,7 +109,7 @@ async function getEligiblePrograms(
   // Get current year
   const currentYear = new Date().getFullYear();
   const targetYear =
-    stage.season === "fall" || stage.season === "spring"
+    stage.season === "fall" || stage.season === "winter" || stage.season === "spring"
       ? currentYear + 1
       : currentYear;
 
@@ -277,16 +274,24 @@ function buildProgramPrompt(
   parts.push("## Instructions");
   parts.push("");
   parts.push(
-    "Based on this profile, recommend 3-5 programs that would be the best fit. Consider:"
+    "Based on this student's complete profile, recommend 3-5 programs that would be the best fit."
   );
-  parts.push("- Alignment with their interests and activities");
-  parts.push("- How the program would strengthen their college application");
-  parts.push("- Realistic chances of admission based on their profile");
-  parts.push("- Deadline urgency");
   parts.push("");
-  parts.push(
-    "Return the program IDs from the list above with your reasoning for each."
-  );
+  parts.push("## Holistic Assessment");
+  parts.push("");
+  parts.push("For each program recommendation, provide a HOLISTIC assessment considering:");
+  parts.push("- **Interest Alignment**: How the program connects to the student's interests, activities, and aspirations");
+  parts.push("- **Profile Strengthening**: How participating would strengthen their college application");
+  parts.push("- **Realistic Fit**: Whether the student has the background and qualifications for the program");
+  parts.push("- **Timing**: Deadline urgency and when in their journey this makes sense");
+  parts.push("");
+  parts.push("For matchLevel, assess holistically:");
+  parts.push("- **High**: Clear alignment with interests/activities, strong profile fit, would meaningfully strengthen application");
+  parts.push("- **Medium**: Good potential fit, some alignment with interests, beneficial but not perfectly aligned");
+  parts.push("- **Low**: Speculative recommendation - could be valuable but uncertain based on current profile");
+  parts.push("");
+  parts.push("Write detailed reasoning (3-5 sentences) explaining WHY this program is a good fit and how it would help them.");
+  parts.push("Include 2-4 specific, actionable next steps for each program.");
 
   return parts.join("\n");
 }

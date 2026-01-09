@@ -25,14 +25,16 @@ export async function GET() {
     // Get profile for stage calculation
     const profile = await prisma.studentProfile.findUnique({
       where: { id: profileId },
-      select: { graduationYear: true },
+      select: { graduationYear: true, grade: true },
     });
 
     // Get existing recommendations
     const recommendations = await getRecommendations(profileId);
 
-    // Calculate current stage
-    const stage = getStudentStage(profile?.graduationYear ?? null);
+    // Calculate current stage - use stored grade if available
+    const stage = getStudentStage(profile?.graduationYear ?? null, {
+      grade: profile?.grade,
+    });
 
     return NextResponse.json({
       recommendations,

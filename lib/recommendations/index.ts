@@ -47,8 +47,8 @@ export async function generateRecommendations(
     throw new Error("Profile not found");
   }
 
-  // Calculate current stage
-  const stage = getStudentStage(profile.graduationYear);
+  // Calculate current stage - use stored grade if available
+  const stage = getStudentStage(profile.graduationYear, { grade: profile.grade });
 
   // Load preferences
   const preferences = await loadPreferences(profileId);
