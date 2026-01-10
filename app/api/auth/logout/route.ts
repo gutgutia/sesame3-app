@@ -7,17 +7,26 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 
+// Cookie options must match those used when setting the cookies
+const cookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "lax" as const,
+  path: "/",
+};
+
 export async function POST() {
   const cookieStore = await cookies();
 
-  // Clear auth cookies - must specify same path used when setting
-  cookieStore.delete({
-    name: "sesame_session",
-    path: "/",
+  // Clear auth cookies by setting them to empty with immediate expiry
+  // This is more reliable than delete() across different browsers
+  cookieStore.set("sesame_session", "", {
+    ...cookieOptions,
+    maxAge: 0,
   });
-  cookieStore.delete({
-    name: "sesame_user_id",
-    path: "/",
+  cookieStore.set("sesame_user_id", "", {
+    ...cookieOptions,
+    maxAge: 0,
   });
 
   return NextResponse.json({ success: true });
@@ -27,14 +36,14 @@ export async function POST() {
 export async function GET() {
   const cookieStore = await cookies();
 
-  // Clear auth cookies - must specify same path used when setting
-  cookieStore.delete({
-    name: "sesame_session",
-    path: "/",
+  // Clear auth cookies by setting them to empty with immediate expiry
+  cookieStore.set("sesame_session", "", {
+    ...cookieOptions,
+    maxAge: 0,
   });
-  cookieStore.delete({
-    name: "sesame_user_id",
-    path: "/",
+  cookieStore.set("sesame_user_id", "", {
+    ...cookieOptions,
+    maxAge: 0,
   });
 
   // Redirect to login page
