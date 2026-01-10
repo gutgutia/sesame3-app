@@ -10,9 +10,15 @@ import { cookies } from "next/headers";
 export async function POST() {
   const cookieStore = await cookies();
 
-  // Clear auth cookies
-  cookieStore.delete("sesame_session");
-  cookieStore.delete("sesame_user_id");
+  // Clear auth cookies - must specify same path used when setting
+  cookieStore.delete({
+    name: "sesame_session",
+    path: "/",
+  });
+  cookieStore.delete({
+    name: "sesame_user_id",
+    path: "/",
+  });
 
   return NextResponse.json({ success: true });
 }
@@ -21,9 +27,15 @@ export async function POST() {
 export async function GET() {
   const cookieStore = await cookies();
 
-  // Clear auth cookies
-  cookieStore.delete("sesame_session");
-  cookieStore.delete("sesame_user_id");
+  // Clear auth cookies - must specify same path used when setting
+  cookieStore.delete({
+    name: "sesame_session",
+    path: "/",
+  });
+  cookieStore.delete({
+    name: "sesame_user_id",
+    path: "/",
+  });
 
   // Redirect to login page
   return NextResponse.redirect(new URL("/auth", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));

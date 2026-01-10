@@ -120,8 +120,8 @@ export function Sidebar() {
       // Clear profile state first to prevent stale data on re-login
       clearProfile();
       await fetch("/api/auth/logout", { method: "POST" });
-      router.push("/login");
-      router.refresh();
+      // Use full page navigation to ensure complete state reset
+      window.location.href = "/login";
     } catch (error) {
       console.error("Logout failed:", error);
     }
