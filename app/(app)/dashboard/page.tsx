@@ -175,7 +175,7 @@ export default function DashboardPage() {
               description="Add your GPA, test scores, activities, and awards."
             />
             <CTACard
-              href="/advisor?mode=chances"
+              href="/chances"
               icon={TrendingUp}
               title="Check Chances"
               description="See how you stack up at dream schools."
@@ -319,7 +319,7 @@ export default function DashboardPage() {
             </h3>
             <div className="space-y-2">
               <Link
-                href="/advisor?mode=chances"
+                href="/chances"
                 className="block p-3 bg-bg-sidebar rounded-lg hover:bg-accent-surface transition-colors"
               >
                 <div className="flex items-center gap-3">

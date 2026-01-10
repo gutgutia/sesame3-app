@@ -146,7 +146,7 @@ export default function SchoolsPage() {
           <p className="text-text-muted">Build and balance your college list.</p>
         </div>
         <div className="flex gap-3">
-          <Link href="/advisor?mode=chances">
+          <Link href="/chances">
             <Button variant="secondary">
               <TrendingUp className="w-4 h-4" />
               Check Chances

@@ -13,7 +13,7 @@ interface QuickAction {
 
 const defaultActions: QuickAction[] = [
   {
-    href: "/advisor?mode=chances",
+    href: "/chances",
     icon: TrendingUp,
     label: "Check Chances",
     description: "See where you stand",
