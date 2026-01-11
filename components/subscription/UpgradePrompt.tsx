@@ -1,17 +1,14 @@
 "use client";
 
+/**
+ * UpgradePrompt - Shows upgrade prompts when users hit limits
+ *
+ * Two-tier system: Free -> Paid ($25/mo or $250/year)
+ */
+
 import React, { useState } from "react";
-import { 
-  Sparkles, 
-  Crown, 
-  ArrowRight,
-  X,
-  Clock,
-  Zap,
-  Loader2,
-} from "lucide-react";
+import { Crown, ArrowRight, X, Clock, Zap, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { cn } from "@/lib/utils";
 
 // =============================================================================
 // TYPES
@@ -25,31 +22,31 @@ interface UpgradePromptProps {
    * - banner: Shows as a top banner
    */
   variant?: "inline" | "modal" | "banner";
-  
-  /**
-   * Current tier to determine what to show
-   */
-  currentTier?: "free" | "standard";
-  
+
   /**
    * Message to display (e.g., "You've reached your daily limit")
    */
   message?: string;
-  
+
   /**
    * When the limit resets
    */
   resetTime?: Date;
-  
+
   /**
    * Callback when user dismisses
    */
   onDismiss?: () => void;
-  
+
   /**
    * Whether to show the dismiss button
    */
   showDismiss?: boolean;
+
+  /**
+   * Feature that triggered this prompt (for context)
+   */
+  feature?: "messages" | "chances" | "recommendations";
 }
 
 // =============================================================================
@@ -58,19 +55,13 @@ interface UpgradePromptProps {
 
 export function UpgradePrompt({
   variant = "inline",
-  currentTier = "free",
   message = "You've reached your daily message limit",
   resetTime,
   onDismiss,
   showDismiss = true,
+  feature,
 }: UpgradePromptProps) {
-  const [isLoading, setIsLoading] = useState<"standard" | "premium" | null>(null);
-
-  // Determine next tier to upgrade to
-  const nextTier = currentTier === "free" ? "standard" : "premium";
-  const nextTierName = nextTier === "standard" ? "Standard" : "Premium";
-  const nextTierPrice = nextTier === "standard" ? "$9.99" : "$24.99";
-  const NextTierIcon = nextTier === "standard" ? Sparkles : Crown;
+  const [isLoading, setIsLoading] = useState(false);
 
   // Format reset time
   const formatResetTime = (date: Date) => {
@@ -78,7 +69,7 @@ export function UpgradePrompt({
     const diff = date.getTime() - now.getTime();
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes}m`;
     }
@@ -86,15 +77,15 @@ export function UpgradePrompt({
   };
 
   // Handle upgrade click
-  const handleUpgrade = async (plan: "standard" | "premium") => {
-    setIsLoading(plan);
+  const handleUpgrade = async () => {
+    setIsLoading(true);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan, yearly: true }),
+        body: JSON.stringify({ plan: "paid", yearly: true }),
       });
-      
+
       if (res.ok) {
         const { url } = await res.json();
         window.location.href = url;
@@ -106,72 +97,59 @@ export function UpgradePrompt({
       console.error("Upgrade error:", error);
       alert("Failed to start checkout");
     } finally {
-      setIsLoading(null);
+      setIsLoading(false);
+    }
+  };
+
+  // Feature-specific messaging
+  const getFeatureDescription = () => {
+    switch (feature) {
+      case "chances":
+        return "Upgrade to Premium for unlimited chances calculations.";
+      case "recommendations":
+        return "Upgrade to Premium for personalized school and program recommendations.";
+      case "messages":
+      default:
+        return "Upgrade to Premium for unlimited messages and our smartest AI advisor.";
     }
   };
 
   // Inline variant (for chat)
   if (variant === "inline") {
     return (
-      <div className="bg-gradient-to-br from-accent-surface to-yellow-50 border border-accent-primary/20 rounded-2xl p-6 my-4">
+      <div className="bg-gradient-to-br from-yellow-50 to-amber-50 border border-yellow-200/50 rounded-2xl p-6 my-4">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-accent-primary/10 flex items-center justify-center shrink-0">
-            <Zap className="w-6 h-6 text-accent-primary" />
+          <div className="w-12 h-12 rounded-xl bg-yellow-100 flex items-center justify-center shrink-0">
+            <Crown className="w-6 h-6 text-yellow-600" />
           </div>
-          
+
           <div className="flex-1">
-            <h3 className="font-semibold text-text-primary mb-1">
-              {message}
-            </h3>
-            
+            <h3 className="font-semibold text-text-primary mb-1">{message}</h3>
+
             {resetTime && (
               <p className="text-sm text-text-muted mb-4 flex items-center gap-1">
                 <Clock className="w-4 h-4" />
                 Resets in {formatResetTime(resetTime)}
               </p>
             )}
-            
+
             <p className="text-sm text-text-secondary mb-4">
-              Upgrade to {nextTierName} for more messages and a more powerful advisor.
+              {getFeatureDescription()}
             </p>
-            
-            <div className="flex flex-wrap gap-3">
-              <Button
-                onClick={() => handleUpgrade(nextTier)}
-                disabled={!!isLoading}
-                className="gap-2"
-              >
-                {isLoading === nextTier ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <NextTierIcon className="w-4 h-4" />
-                    Upgrade to {nextTierName}
-                    <span className="text-white/70">{nextTierPrice}/mo</span>
-                  </>
-                )}
-              </Button>
-              
-              {currentTier === "free" && (
-                <Button
-                  variant="secondary"
-                  onClick={() => handleUpgrade("premium")}
-                  disabled={!!isLoading}
-                  className="gap-2"
-                >
-                  {isLoading === "premium" ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <>
-                      <Crown className="w-4 h-4" />
-                      Go Premium
-                    </>
-                  )}
-                </Button>
+
+            <Button onClick={handleUpgrade} disabled={isLoading} className="gap-2">
+              {isLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Crown className="w-4 h-4" />
+                  Upgrade to Premium
+                  <span className="text-white/70">$25/mo</span>
+                </>
               )}
-            </div>
+            </Button>
           </div>
-          
+
           {showDismiss && onDismiss && (
             <button
               onClick={onDismiss}
@@ -188,7 +166,7 @@ export function UpgradePrompt({
   // Banner variant (for top of page)
   if (variant === "banner") {
     return (
-      <div className="bg-gradient-to-r from-accent-primary to-yellow-500 text-white px-4 py-3">
+      <div className="bg-gradient-to-r from-yellow-500 to-amber-500 text-white px-4 py-3">
         <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Zap className="w-5 h-5" />
@@ -199,25 +177,25 @@ export function UpgradePrompt({
               </span>
             )}
           </div>
-          
+
           <div className="flex items-center gap-3">
             <Button
               variant="secondary"
               size="sm"
-              onClick={() => handleUpgrade(nextTier)}
-              disabled={!!isLoading}
-              className="bg-white text-accent-primary hover:bg-white/90"
+              onClick={handleUpgrade}
+              disabled={isLoading}
+              className="bg-white text-yellow-600 hover:bg-white/90"
             >
               {isLoading ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <>
-                  Upgrade to {nextTierName}
+                  Upgrade to Premium
                   <ArrowRight className="w-4 h-4 ml-1" />
                 </>
               )}
             </Button>
-            
+
             {showDismiss && onDismiss && (
               <button onClick={onDismiss} className="text-white/70 hover:text-white">
                 <X className="w-5 h-5" />
@@ -241,16 +219,16 @@ export function UpgradePrompt({
             <X className="w-5 h-5" />
           </button>
         )}
-        
+
         <div className="text-center mb-6">
-          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-accent-primary to-yellow-400 flex items-center justify-center mb-4">
-            <Zap className="w-8 h-8 text-white" />
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-yellow-100 to-amber-100 flex items-center justify-center mb-4">
+            <Crown className="w-8 h-8 text-yellow-600" />
           </div>
-          
+
           <h2 className="text-xl font-semibold text-text-primary mb-2">
             {message}
           </h2>
-          
+
           {resetTime && (
             <p className="text-text-muted flex items-center justify-center gap-1">
               <Clock className="w-4 h-4" />
@@ -258,45 +236,23 @@ export function UpgradePrompt({
             </p>
           )}
         </div>
-        
+
         <p className="text-center text-text-secondary mb-6">
-          Upgrade your plan for more messages and access to our most powerful AI advisor.
+          {getFeatureDescription()}
         </p>
-        
+
         <div className="space-y-3">
-          <Button
-            className="w-full gap-2"
-            onClick={() => handleUpgrade(nextTier)}
-            disabled={!!isLoading}
-          >
-            {isLoading === nextTier ? (
+          <Button className="w-full gap-2" onClick={handleUpgrade} disabled={isLoading}>
+            {isLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
-                <NextTierIcon className="w-4 h-4" />
-                Upgrade to {nextTierName} — {nextTierPrice}/mo
+                <Crown className="w-4 h-4" />
+                Upgrade to Premium — $25/mo
               </>
             )}
           </Button>
-          
-          {currentTier === "free" && (
-            <Button
-              variant="secondary"
-              className="w-full gap-2"
-              onClick={() => handleUpgrade("premium")}
-              disabled={!!isLoading}
-            >
-              {isLoading === "premium" ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Crown className="w-4 h-4" />
-                  Go Premium — $24.99/mo
-                </>
-              )}
-            </Button>
-          )}
-          
+
           {onDismiss && (
             <button
               onClick={onDismiss}
@@ -323,22 +279,28 @@ export function useUpgradePrompt() {
   const [promptData, setPromptData] = useState<{
     message: string;
     resetTime?: Date;
-    currentTier?: "free" | "standard";
+    feature?: "messages" | "chances" | "recommendations";
   } | null>(null);
 
   const handleUsageLimitError = (error: {
     error: string;
     message: string;
-    usage: {
+    usage?: {
       dailyLimit: number;
       messageLimit: number;
     };
     resetTime?: string;
+    feature?: "messages" | "chances" | "recommendations";
   }) => {
-    if (error.error === "usage_limit_exceeded") {
+    if (
+      error.error === "usage_limit_exceeded" ||
+      error.error === "free_tier_limit" ||
+      error.error === "paid_feature"
+    ) {
       setPromptData({
         message: error.message,
         resetTime: error.resetTime ? new Date(error.resetTime) : undefined,
+        feature: error.feature,
       });
       setShowPrompt(true);
       return true;
@@ -358,4 +320,3 @@ export function useUpgradePrompt() {
     dismissPrompt,
   };
 }
-
