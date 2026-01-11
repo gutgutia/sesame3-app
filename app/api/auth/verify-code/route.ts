@@ -3,6 +3,10 @@
  *
  * Verifies the OTP code and creates a session.
  * For new users, also creates the User record and sends a welcome email.
+ *
+ * Mobile Support:
+ * - Include X-Client-Type: mobile header to receive JWT tokens instead of cookies
+ * - Response includes { accessToken, refreshToken, expiresIn } for mobile clients
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -11,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { sendEmail } from "@/lib/email/resend";
 import { SignupNotificationEmail, WelcomeEmail } from "@/lib/email/templates";
 import { cookies } from "next/headers";
+import { generateTokenPair, isMobileClient } from "@/lib/mobile-auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -233,6 +238,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Generate tokens for mobile clients
+    const isMobile = isMobileClient(request);
+    let tokenData = {};
+
+    if (isMobile) {
+      const tokens = await generateTokenPair(user.id, user.email);
+      tokenData = {
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+        expiresIn: tokens.expiresIn,
+        refreshExpiresIn: tokens.refreshExpiresIn,
+      };
+    }
+
     return NextResponse.json({
       success: true,
       isNewUser,
@@ -241,6 +260,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
       },
       redirectTo,
+      ...tokenData,
     });
   } catch (error) {
     console.error("[Auth] Error verifying code:", error);

@@ -2,13 +2,16 @@
  * Authentication Helpers
  *
  * Handles session verification and user retrieval.
- * Uses custom email OTP sessions (sesame_session cookie).
+ * Supports both:
+ * - Cookie-based auth (web): sesame_session cookie
+ * - Token-based auth (mobile): Authorization: Bearer <token>
  *
  * PERFORMANCE: Uses cached profileId cookie to avoid DB lookups on every request.
  */
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "./db";
+import { verifyToken, extractBearerToken } from "./mobile-auth";
 
 const SESSION_COOKIE = "sesame_session";
 const USER_ID_COOKIE = "sesame_user_id";
@@ -66,10 +69,40 @@ function getSessionUserId(cookieStore: Awaited<ReturnType<typeof cookies>>): str
 /**
  * Get the current authenticated user
  *
+ * Checks in order:
+ * 1. Bearer token (mobile apps)
+ * 2. Session cookie (web)
+ * 3. User ID cookie (fallback)
+ *
  * PERFORMANCE NOTE: This does a DB lookup. For most API routes,
  * use getCurrentProfileId() instead which uses cached profileId.
  */
 export async function getCurrentUser(): Promise<AuthUser | null> {
+  // Check for bearer token first (mobile apps)
+  const headerStore = await headers();
+  const authHeader = headerStore.get("authorization");
+  const bearerToken = extractBearerToken(authHeader);
+
+  if (bearerToken) {
+    const payload = verifyToken(bearerToken);
+    if (payload && payload.type === "access") {
+      // Verify user still exists in database
+      const user = await prisma.user.findUnique({
+        where: { id: payload.userId },
+        select: { id: true, email: true, name: true },
+      });
+
+      if (user) {
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name || undefined,
+        };
+      }
+    }
+  }
+
+  // Fall back to cookie-based auth (web)
   const cookieStore = await cookies();
 
   // Check for session token
@@ -128,22 +161,44 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
  * Only does DB lookup on first request, then caches in cookie.
  *
  * Priority:
- * 1. Cached profileId from cookie (instant, no DB)
- * 2. User's own profile (if exists)
- * 3. First shared profile via AccessGrant (if user has access to others)
- * 4. Create a new profile for the user
+ * 1. Bearer token auth (mobile apps) - no caching, always verify
+ * 2. Cached profileId from cookie (instant, no DB)
+ * 3. User's own profile (if exists)
+ * 4. First shared profile via AccessGrant (if user has access to others)
+ * 5. Create a new profile for the user
  */
 export async function getCurrentProfileId(): Promise<string | null> {
-  const cookieStore = await cookies();
+  // Check for bearer token first (mobile apps)
+  const headerStore = await headers();
+  const authHeader = headerStore.get("authorization");
+  const bearerToken = extractBearerToken(authHeader);
 
-  // FAST PATH: Check for cached profileId
-  const userId = getSessionUserId(cookieStore);
+  let userId: string | null = null;
+  let isMobileAuth = false;
+
+  if (bearerToken) {
+    const payload = verifyToken(bearerToken);
+    if (payload && payload.type === "access") {
+      userId = payload.userId;
+      isMobileAuth = true;
+    }
+  }
+
+  // Fall back to cookie-based auth (web)
+  const cookieStore = await cookies();
+  if (!userId) {
+    userId = getSessionUserId(cookieStore);
+  }
+
   if (!userId) return null;
 
-  const cachedProfileId = cookieStore.get(PROFILE_ID_COOKIE)?.value;
-  if (cachedProfileId) {
-    // Trust the cached profileId - it was set when we first looked it up
-    return cachedProfileId;
+  // Skip cookie cache for mobile auth (they don't use cookies)
+  if (!isMobileAuth) {
+    const cachedProfileId = cookieStore.get(PROFILE_ID_COOKIE)?.value;
+    if (cachedProfileId) {
+      // Trust the cached profileId - it was set when we first looked it up
+      return cachedProfileId;
+    }
   }
 
   // SLOW PATH: First request - need to look up profileId
@@ -221,8 +276,8 @@ export async function getCurrentProfileId(): Promise<string | null> {
     }
   }
 
-  // Cache the profileId for future requests
-  if (profileId) {
+  // Cache the profileId for future requests (skip for mobile auth)
+  if (profileId && !isMobileAuth) {
     cookieStore.set(PROFILE_ID_COOKIE, profileId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

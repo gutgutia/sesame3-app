@@ -2,10 +2,19 @@
  * POST /api/auth/logout
  *
  * Clears authentication cookies and logs the user out.
+ *
+ * Mobile Support:
+ * - For mobile clients, also revokes all refresh tokens for the user
+ * - Include Authorization: Bearer <token> header for mobile logout
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import {
+  extractBearerToken,
+  verifyToken,
+  revokeAllTokens,
+} from "@/lib/mobile-auth";
 
 // Cookie options must match those used when setting the cookies
 const cookieOptions = {
@@ -15,7 +24,19 @@ const cookieOptions = {
   path: "/",
 };
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // Check for bearer token (mobile logout)
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = extractBearerToken(authHeader);
+
+  if (bearerToken) {
+    const payload = verifyToken(bearerToken);
+    if (payload) {
+      // Revoke all refresh tokens for this user
+      await revokeAllTokens(payload.userId);
+    }
+  }
+
   const cookieStore = await cookies();
 
   // Clear ALL auth cookies by setting them to empty with immediate expiry

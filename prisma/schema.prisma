@@ -39,6 +39,24 @@ model AuthCode {
   @@index([expiresAt])
 }
 
+// -----------------------------------------------------------------------------
+// RefreshToken - Mobile App Token Management
+// -----------------------------------------------------------------------------
+
+model RefreshToken {
+  id        String    @id // Token ID (jti from JWT)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  expiresAt DateTime
+  revokedAt DateTime? // Set when token is revoked/rotated
+
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -86,6 +104,7 @@ model User {
   accessGrantsReceived AccessGrant[] @relation("GrantedTo")
   usageRecords      UsageRecord[]
   invitationsSent   Invitation[]
+  refreshTokens     RefreshToken[]
 
   // Future: Organization membership
   organizationMemberships OrganizationMember[]
