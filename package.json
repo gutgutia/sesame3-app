@@ -13,6 +13,7 @@
     "db:studio": "dotenv -e .env -- prisma studio",
     "db:seed-all": "dotenv -e .env.local -- tsx prisma/seed-all.ts",
     "db:seed-programs": "dotenv -e .env.local -- tsx prisma/seed-programs.ts",
+    "db:validate-programs": "tsx scripts/validate-programs-batch.ts",
     "db:seed-schools": "dotenv -e .env.local -- tsx prisma/seed-schools.ts",
     "db:seed-users": "dotenv -e .env.local -- tsx prisma/seed-users.ts",
     "db:cleanup": "dotenv -e .env.local -- tsx prisma/db-cleanup.ts",

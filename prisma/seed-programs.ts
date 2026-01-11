@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { batchPrograms as batch1Programs } from "./seeds/batch-1-programs";
 
 const prisma = new PrismaClient();
 
@@ -1279,7 +1280,13 @@ const summerPrograms2026: SummerProgramSeed[] = [
 async function seedSummerPrograms() {
   console.log("Seeding summer programs...");
 
-  for (const programData of summerPrograms2026) {
+  // Combine all program batches
+  const allPrograms = [
+    ...summerPrograms2026,
+    ...batch1Programs,
+  ];
+
+  for (const programData of allPrograms) {
     const { sessions, ...program } = programData;
 
     const existing = await prisma.summerProgram.findFirst({
@@ -1335,7 +1342,7 @@ async function seedSummerPrograms() {
     }
   }
 
-  console.log(`Seeded ${summerPrograms2026.length} summer programs for 2026`);
+  console.log(`Seeded ${allPrograms.length} summer programs for 2026`);
 }
 
 async function main() {
